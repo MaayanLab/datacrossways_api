@@ -2,6 +2,13 @@ from flask import Flask, url_for, redirect, session
 from authlib.integrations.flask_client import OAuth
 import json
 
+from auth_decorator import login_required
+
+# dotenv setup
+from dotenv import load_dotenv
+load_dotenv()
+
+
 from datetime import timedelta
 
 def read_config():
@@ -32,6 +39,7 @@ oauth.register(
 )
 
 @app.route('/')
+@login_required
 def hello_world():
     email= dict(session).get("email", None)
     return f'Hello {email}!'
@@ -53,3 +61,8 @@ def authorize():
     # do something with the token and profile
     return redirect('/')
 
+@app.route('/logout')
+def logout():
+    for key in list(session.keys()):
+        session.pop(key)
+    return redirect('/')
