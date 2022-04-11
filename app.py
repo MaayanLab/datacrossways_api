@@ -1,6 +1,9 @@
-from flask import Flask, url_for, redirect, session
+from flask import Flask, url_for, redirect, session, request, jsonify
 from authlib.integrations.flask_client import OAuth
 import json
+from flask_cors import CORS
+
+import s3utils
 
 from auth_decorator import login_required
 
@@ -15,7 +18,12 @@ def read_config():
     f = open('secrets/config.json')
     return json.load(f)
 
-app = Flask(__name__)
+app = Flask(__name__, 
+        static_url_path='', 
+        static_folder='static',
+        template_folder='templates')
+
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
 app.secret_key = "ffx#xkj$WWs2"
 app.config['SESSION_COOKIE_NAME'] = 'google-login-session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
@@ -66,3 +74,33 @@ def logout():
     for key in list(session.keys()):
         session.pop(key)
     return redirect('/')
+
+@app.route('/upload', methods = ['POST'])
+def upload():
+    data = request.get_json()
+    # check whether user has rights to upload data
+    # general upload rights, resource write credentials (e.g. user is allowed to write)
+    response = s3utils.sign_upload_file(data["filename"], conf["aws"])
+    res = {'status': 'ok', 'response': response}
+    return jsonify(res)
+
+@app.route('/startmultipart', methods = ['POST'])
+def startmultipart():
+    data = request.get_json()
+    response = s3utils.start_multipart(data["filename"], conf["aws"])
+    res = {'status': 'ok', 'upload_id': response}
+    return jsonify(res)
+
+@app.route('/signmultipart', methods = ['POST'])
+def signmultipart():
+    data = request.get_json()
+    url = s3utils.sign_multipart(data["filename"], data["upload_id"], data["part_number"], conf["aws"])
+    res = {'status': 'ok', 'url': url}
+    return jsonify(res)
+
+@app.route('/completemultipart', methods = ['POST'])
+def completemultipart():
+    data = request.get_json()
+    s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
+    res = {'status': 'ok'}
+    return jsonify(res)
