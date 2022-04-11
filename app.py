@@ -101,6 +101,7 @@ def signmultipart():
 @app.route('/completemultipart', methods = ['POST'])
 def completemultipart():
     data = request.get_json()
+    print(data)
     s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
     res = {'status': 'ok'}
     return jsonify(res)

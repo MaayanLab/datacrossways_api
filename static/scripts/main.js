@@ -1,4 +1,5 @@
 var filenames = [];
+var base_url = "http://localhost:5055"
 
 function progress_bar(filename) {
     $('#upload-wrapper').hide();
@@ -65,7 +66,7 @@ function upload_file() {
             if (file.size < 10 * 1024 * 1024) {
                 $.ajax({
                     type: 'POST',
-                    url: 'http://localhost:5000/upload',
+                    url: base_url+'/upload',
                     data: '{"filename": "' + file['name'] + '"}', // or JSON.stringify ({name: 'jonas'}),
                     success: function (data) {
                         var FD = new FormData();
@@ -111,17 +112,19 @@ function upload_file() {
                 });
             } // simple file upload
             else {
-                var file_slice = file.slice(0, 5*1024*1024)
-                var chunk_number = file.size/(5*1024*1024)
+                //var file_slice = file.slice(0, 5*1024*1024)
+                var chunk_size = 5*1024*1024
+                var chunk_number = file.size/chunk_size
                 var chunks = range(chunk_number)
-                console.log(chunks)
+
                 var payload = JSON.stringify({
                     "filename": file['name']
                 });
 
                 (async() => {
-                    const response = await fetch('http://localhost:5000/startmultipart', 
-                    {   
+                    var parts = []
+                    const response = await fetch(base_url+'/startmultipart', 
+                    {
                         method: "POST",
                         headers: {
                             'Accept': 'application/json',
@@ -130,26 +133,49 @@ function upload_file() {
                         body: payload
                     })
                     const res = await response.json();
-                    console.log(res)
 
                     await Promise.all(chunks.map(async (chunk) => {
-                        var payload_part = JSON.stringify({
+                        var payload_part = {
                             "filename": file['name'],
                             "upload_id": res["upload_id"],
                             "part_number": chunk
-                        });
-                        console.log(payload_part)
-                        const response = await fetch('http://localhost:5000/signmultipart', {
-                            method: 'POST',
+                        }
+                        const res_part = await fetch(base_url+'/signmultipart', 
+                        {   
+                            method: "POST",
                             headers: {
+                                'Accept': 'application/json',
                                 'Content-Type': 'application/json'
                             },
-                            data: payload_part
+                            body: JSON.stringify(payload_part)
                         })
-                        const signed_part = await response;
-                        console.log(signed_part);
-                    }))
+                        const res_signed_part = await res_part.json();
 
+                        fetch(res_signed_part["url"], 
+                        {   
+                            method: "PUT",
+                            body: file.slice(chunk*chunk_size, Math.min(file.size, (chunk+1)*chunk_size)),
+                        }).then(function(resp){
+                            var etag = resp.headers.get("etag")
+                            console.log(etag)
+                            parts.push({"ETag": etag, "PartNumber": chunk})
+                        })
+                    })) // promise all complete
+                    console.log(parts)
+                    payload_complete = {
+                        "filename": file['name'],
+                        "upload_id": res["upload_id"],
+                        "parts": parts
+                    }
+                    console.log(payload_complete)
+                    fetch(base_url+"/completemultipart", {
+                        method: "POST",
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload_complete)
+                    }) // end complete
                 })(); // end async
             }
         })
