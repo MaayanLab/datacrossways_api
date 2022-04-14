@@ -1,5 +1,27 @@
 var filenames = [];
-var base_url = "http://localhost:5055"
+var base_url = "http://localhost:5000/api"
+
+const pAll = async (queue, concurrency) => {
+    let index = 0;
+    const results = [];
+  
+    // Run a pseudo-thread
+    const execThread = async () => {
+      while (index < queue.length) {
+        const curIndex = index++;
+        // Use of `curIndex` is important because `index` may change after await is resolved
+        results[curIndex] = await queue[curIndex]();
+      }
+    };
+  
+    // Start threads
+    const threads = [];
+    for (let thread = 0; thread < concurrency; thread++) {
+      threads.push(execThread());
+    }
+    await Promise.all(threads);
+    return results;
+};
 
 function progress_bar(filename) {
     $('#upload-wrapper').hide();
@@ -23,6 +45,33 @@ function range(n) {
     const R = []
     for (let i = 1; i < n+1; i++) R.push(i)
     return R
+}
+
+async function upload_chunk(chunk, uid, uuid, file, chunk_size) {
+    var payload_part = {
+        "filename": uuid+"/"+file['name'],
+        "upload_id": uid,
+        "part_number": chunk
+    }
+    const res_part = await fetch(base_url+'/signmultipart', 
+    {   
+        method: "POST",
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload_part)
+    })
+    const res_signed_part = await res_part.json();
+
+    const resp = await fetch(res_signed_part["url"], 
+    {   
+        method: "PUT",
+        body: file.slice((chunk-1)*chunk_size, Math.min(file.size, (chunk)*chunk_size)),
+    })
+    
+    var etag = await resp.headers.get("etag").replaceAll("\"", "")
+    return {"ETag": etag, "PartNumber": chunk}
 }
 
 // Upload Reads to Amazon S3 Bucket
@@ -56,73 +105,44 @@ function upload_file() {
         // Alert wrong format files
         alert('BioJupies only supports alignment of files in the .fastq.gz or .fq.gz formats. The following file(s) are stored in formats which are currently not supported. Please remove or reformat them to proceed.\n\n • ' + wrong_format_files.join('\n • '));
     } else {
-
         // Loop through files
         $.each(files, function (index, file) {
-
-            // Add progress bar
-            // progress_bar(file['name']);
-            // use simple file upload for small files and multipart otherwise
             if (file.size < 10 * 1024 * 1024) {
-                $.ajax({
-                    type: 'POST',
-                    url: base_url+'/upload',
-                    data: '{"filename": "' + file['name'] + '"}', // or JSON.stringify ({name: 'jonas'}),
-                    success: function (data) {
-                        var FD = new FormData();
-                        for (var key in data["response"]["fields"]) {
-                            FD.append(key, data["response"]["fields"][key]);
-                        }
-                        FD.append('file', file);
+                (async() => {
+                    const response = await fetch(base_url+'/upload', 
+                    {
+                        method: "POST",
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify ({"filename": file['name']})
+                    })
+                    const data = await response.json();
+                    var formdata = new FormData();
+                    for (var key in data["response"]["fields"]) {
+                        formdata.append(key, data["response"]["fields"][key]);
+                    }
+                    formdata.append('file', file);
+                    
+                    fetch(data["response"]["url"], 
+                    {
+                        method: "POST",
+                        body: formdata
+                    })
+                })(); // end async
 
-                        var filename = file['name'];
-
-                        // Create Request
-                        var xhr = new XMLHttpRequest();
-                        xhr.open("POST", data["response"]["url"], true);
-                        xhr.onloadstart = function (e) {
-                            console.log("start")
-                        }
-                        xhr.onloadend = function (e) {
-                            // Set complete status on progress bar
-                            $('[data-filename="' + filename + '"] .progress-bar').attr('data-status', 'complete');
-                            $('[data-filename="' + filename + '"] .progress-bar-text span:first-child').html('Successfully uploaded ');
-                            $('[data-filename="' + filename + '"] .progress-bar-text span:last-child').html('');
-
-                            // Activate button if all progress bars are complete
-                            if ($('.progress-bar').length === $('.progress-bar[data-status="complete"]').length) {
-                                $('.continue-button').prop('disabled', false).toggleClass('black white bg-white bg-blue');
-                            }
-                            
-                            filenames.push(filename);
-                            // Call FASTQ Upload Status API
-                        }
-                        xhr.upload.addEventListener('progress', function (evt) {
-                            if (evt.lengthComputable) {
-                                var progress = Math.ceil((evt.loaded / evt.total) * 100) + '%';
-                                $('[data-filename="' + filename + '"] .progress-bar').html(progress);
-                                $('[data-filename="' + filename + '"] .progress-bar').css('width', progress);
-                            }
-                        }, false);
-                        xhr.send(FD);
-
-                    },
-                    contentType: "application/json",
-                    dataType: 'json'
-                });
             } // simple file upload
             else {
-                //var file_slice = file.slice(0, 5*1024*1024)
-                var chunk_size = 5*1024*1024
-                var chunk_number = file.size/chunk_size
-                var chunks = range(chunk_number)
+                var chunk_size = 6*1024*1024;
+                var chunk_number = file.size/chunk_size;
+                var chunks = range(chunk_number);
 
                 var payload = JSON.stringify({
                     "filename": file['name']
                 });
 
                 (async() => {
-                    var parts = []
                     const response = await fetch(base_url+'/startmultipart', 
                     {
                         method: "POST",
@@ -134,40 +154,17 @@ function upload_file() {
                     })
                     const res = await response.json();
 
-                    await Promise.all(chunks.map(async (chunk) => {
-                        var payload_part = {
-                            "filename": file['name'],
-                            "upload_id": res["upload_id"],
-                            "part_number": chunk
-                        }
-                        const res_part = await fetch(base_url+'/signmultipart', 
-                        {   
-                            method: "POST",
-                            headers: {
-                                'Accept': 'application/json',
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(payload_part)
-                        })
-                        const res_signed_part = await res_part.json();
-
-                        fetch(res_signed_part["url"], 
-                        {   
-                            method: "PUT",
-                            body: file.slice(chunk*chunk_size, Math.min(file.size, (chunk+1)*chunk_size)),
-                        }).then(function(resp){
-                            var etag = resp.headers.get("etag")
-                            console.log(etag)
-                            parts.push({"ETag": etag, "PartNumber": chunk})
-                        })
-                    })) // promise all complete
-                    console.log(parts)
-                    payload_complete = {
-                        "filename": file['name'],
+                    const values = await pAll(
+                        chunks.map(chunk => () => upload_chunk(chunk, res["upload_id"], res["uuid"], file, chunk_size)),
+                        4
+                    );
+                    
+                    var payload_complete = {
+                        "filename": res["uuid"]+"/"+file['name'],
                         "upload_id": res["upload_id"],
-                        "parts": parts
+                        "parts": values
                     }
-                    console.log(payload_complete)
+                    
                     fetch(base_url+"/completemultipart", {
                         method: "POST",
                         headers: {
@@ -176,6 +173,7 @@ function upload_file() {
                         },
                         body: JSON.stringify(payload_complete)
                     }) // end complete
+
                 })(); // end async
             }
         })
