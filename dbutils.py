@@ -27,6 +27,14 @@ def create_file(db, file_name, user_id):
     db.session.commit()
     return {"id": file.id, "name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner": file.owner_id}
 
+def list_roles():
+    db_roles = Role.query.all()
+    print(db_roles)
+    roles = []
+    for role in db_roles:
+        roles.append({"id": role.id, "name": role.name})
+    return roles
+
 def list_user_files(user_id):
     db_files = File.query.filter_by(owner_id=user_id).all()
     files = []
@@ -35,12 +43,12 @@ def list_user_files(user_id):
     return files
 
 def list_users():
-    db_users = User.query.all()
+    db_users = User.query.order_by(User.id).all()
     users = []
     for user in db_users:
         roles = get_user_roles(user.id)
         files = list_user_files(user.id)
-        users.append({"id": user.id, "name": user.name, "uuid": user.uuid, "first_name": user.first_name, "last_name": user.last_name, "date": user.creation_date, "roles": roles, "files": files})
+        users.append({"id": user.id, "name": user.name, "uuid": user.uuid, "first_name": user.first_name, "last_name": user.last_name, "affiliation": user.affiliation,  "date": user.creation_date, "roles": roles, "files": files, "email": user.email})
     return users
 
 def get_file(file_id):
@@ -61,4 +69,28 @@ def append_role(user_id, role_name):
     user = db.session.query(User).filter(User.id == user_id).first()
     role = Role.query.filter(Role.name==role_name).first()
     user.roles.append(role)
+    db.session.commit()
+
+def update_user(db, user, updater_id):
+    print(user["id"])
+    db_user = db.session.query(User).filter(User.id == user["id"]).first()
+    db_user.firstname = user["first_name"]
+    db_user.lastname = user["last_name"]
+    db_user.email = user["email"]
+    db_user.affiliation = user["affiliation"]
+
+    newroles = []
+    for r in user["roles"]:
+        if user["roles"][r]:
+            newroles.append(r)
+
+    for role in db_user.roles:
+        if role.name not in newroles:
+            db_user.roles.remove(role)
+    
+    for role_name in newroles:
+        role = Role.query.filter(Role.name==role_name).first()
+        if role not in db_user.roles:
+            db_user.roles.append(role)
+
     db.session.commit()

@@ -18,6 +18,7 @@ class User(db.Model):
     first_name = db.Column(db.String())
     last_name = db.Column(db.String())
     email = db.Column(db.String())
+    affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid)
 
@@ -26,11 +27,12 @@ class User(db.Model):
     collection_id = db.relationship('Collection', cascade='all, delete', backref='user', lazy=True)
     roles = db.relationship('Role', secondary='user_roles')
 
-    def __init__(self, name, first_name, last_name, email):
+    def __init__(self, name, first_name, last_name, email, affiliation=""):
         self.name = name
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
+        self.affiliation = affiliation
  
     def __repr__(self):
         return f"{self.id}: {self.name}: {self.email}: {self.uuid}"
@@ -88,6 +90,9 @@ class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(50), unique=True)
+
+    def __repr__(self):
+        return f"{self.id}: {self.name}"
 
 # Define the UserRoles association table
 class UserRole(db.Model):

@@ -54,3 +54,34 @@ from app import db, User, File, Collection, Role, UserRole
 users = User.query.all()
 for u in users:
     print(u)
+
+
+from app import db, User, File, Collection, Role, UserRole
+user = db.session.query(User).filter(User.id == 1).first()
+user.affiliation = "Mount Sinai"
+db.session.commit()
+
+user = db.session.query(User).filter(User.id == 1).first()
+print(user.affiliation)
+
+
+db_user = db.session.query(User).filter(User.id == 1).first()
+
+user = {}
+user["roles"] = {"Admin": True, "ListFiles": False, "Uploader": False}
+
+newroles = []
+for r in user["roles"]:
+    if user["roles"][r]:
+        newroles.append(r)
+
+for role in db_user.roles:
+    if role.name not in newroles:
+        db_user.roles.remove(role)
+
+for role_name in newroles:
+    role = Role.query.filter(Role.name==role_name).first()
+    if role not in db_user.roles:
+        db_user.roles.append(role)
+
+db.session.commit()

@@ -6,9 +6,25 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from models import db, User, File, Collection, Role, UserRole
+
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
+
+
+import requests
+
 import dbutils
 
 import s3utils
+
+from flask import Response
 
 from middleware import login_required, upload_credentials, admin_required
 
@@ -23,19 +39,23 @@ def read_config():
     return json.load(f)
 
 app = Flask(__name__, 
-        static_url_path='', 
+        static_url_path='/st',
         static_folder='static',
         template_folder='templates')
 
 cors = CORS(app, resources={r"/*": {"origins": "*"}})
 app.secret_key = "ffx#xkj$WWs2"
 app.config['SESSION_COOKIE_NAME'] = 'google-login-session'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
 
 conf = read_config()
 
 app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.session_protection = "strong"
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -56,6 +76,7 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'},
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
 )
+
 
 @app.route('/api', methods = ["GET"])
 def api():
@@ -100,7 +121,8 @@ def authorize():
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
     session.permanent = True
     # do something with the token and profile
-    return redirect('/')
+    #return redirect('/')
+    return redirect('http://localhost:5000/admin')
 
 @app.route('/logout')
 @login_required
@@ -109,11 +131,18 @@ def logout():
         session.pop(key)
     return redirect('/')
 
-@app.route('/api/test', methods = ['GET'])
+@app.route('/api/ping', methods = ['GET'])
+def ping():
+    payload = {"ping": "pong"}
+    return jsonify(payload)
+
+@app.route('/api/updateuser', methods = ['POST'])
 @login_required
-def test():
-    print(session["user"])
-    file = dbutils.create_file(db, "interface.tsv", session["user"]["id"])
+@admin_required
+def update_user():
+    user = request.get_json()
+    print(user)
+    file = dbutils.update_user(db, user, session["user"]["id"])
     return jsonify(file)
 
 @app.route('/api/listfiles', methods = ['GET'])
@@ -128,6 +157,13 @@ def list_user_files():
 def list_users():
     users = dbutils.list_users()
     return jsonify(users)
+
+@app.route('/api/listroles', methods = ['GET'])
+@login_required
+@admin_required
+def list_roles():
+    roles = dbutils.list_roles()
+    return jsonify(roles)
 
 @app.route('/api/download', methods = ['POST'])
 @login_required
@@ -177,3 +213,21 @@ def completemultipart():
     s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
     res = {'status': 'ok'}
     return jsonify(res)
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def proxy(*args, **kwargs):
+    resp = requests.request(
+        method=request.method,
+        url=request.url.replace(request.host_url, 'http://localhost:3000/'),
+        headers={key: value for (key, value) in request.headers if key != 'Host'},
+        data=request.get_data(),
+        cookies=request.cookies,
+        allow_redirects=False)
+
+    excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
+    headers = [(name, value) for (name, value) in resp.raw.headers.items()
+               if name.lower() not in excluded_headers]
+
+    response = Response(resp.content, resp.status_code, headers)
+    return response

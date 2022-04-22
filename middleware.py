@@ -1,4 +1,4 @@
-from flask import session
+from flask import session, jsonify
 from functools import wraps
 import dbutils
 
@@ -10,7 +10,7 @@ def login_required(f):
         # the other data for that user/check if they exist
         if user:
             return f(*args, **kwargs)
-        return 'You are currently not logged in!<br><a href=\"/login\">Login with Goolge</a>'
+        return jsonify({'error': 'You are currently not logged in!'})
     return decorated_function
 
 def upload_credentials(f):
@@ -33,5 +33,5 @@ def admin_required(f):
         print(user_roles)
         if "Admin" in set(user_roles):
             return f(*args, **kwargs)
-        return 'You need to be Admin for this operation.'
+        return jsonify({'error': 'You need to be Admin for this operation.'})
     return decorated_function
