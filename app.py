@@ -131,24 +131,37 @@ def logout():
         session.pop(key)
     return redirect('/')
 
-@app.route('/api/ping', methods = ['GET'])
-def ping():
-    payload = {"ping": "pong"}
-    return jsonify(payload)
-
 @app.route('/api/updateuser', methods = ['POST'])
 @login_required
 @admin_required
 def update_user():
     user = request.get_json()
     print(user)
-    file = dbutils.update_user(db, user, session["user"]["id"])
+    dbutils.update_user(db, user, session["user"]["id"])
     return jsonify(file)
+
+@app.route('/api/updatefile', methods = ['POST'])
+@login_required
+@admin_required
+def update_file():
+    file = request.get_json()
+    print(file)
+    print(file["display_name"])
+    dbutils.update_file(db, file, session["user"]["id"])
+    #file = dbutils.update_user(db, user, session["user"]["id"])
+    return jsonify({"done": "ok"})
 
 @app.route('/api/listfiles', methods = ['GET'])
 @login_required
 def list_user_files():
     files = dbutils.list_user_files(session["user"]["id"])
+    return jsonify(files)
+
+@app.route('/api/listallfiles', methods = ['GET'])
+@login_required
+@admin_required
+def list_all_files():
+    files = dbutils.list_all_files()
     return jsonify(files)
 
 @app.route('/api/listusers', methods = ['GET'])
@@ -164,6 +177,13 @@ def list_users():
 def list_roles():
     roles = dbutils.list_roles()
     return jsonify(roles)
+
+@app.route('/api/listcollections', methods = ['GET'])
+@login_required
+@admin_required
+def list_collections():
+    collections = dbutils.list_collections()
+    return jsonify(collections)
 
 @app.route('/api/download', methods = ['POST'])
 @login_required

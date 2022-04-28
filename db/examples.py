@@ -85,3 +85,34 @@ for role_name in newroles:
         db_user.roles.append(role)
 
 db.session.commit()
+
+
+
+from app import db, User, File, Collection, Role, UserRole
+db.session.query(
+    File, 
+    User.name
+).filter(
+    File.owner_id == User.id
+).all()
+
+from app import db, User, File, Collection, Role, UserRole
+db.session.query(File, User.name).filter(File.owner_id == User.id).all()[0]
+
+
+
+from app import db, User, File, Collection, Role, UserRole
+collection = Collection(name="base", user=user_1)
+db.session.add_all([collection])
+db.session.commit()
+
+from app import db, User, File, Collection, Role, UserRole
+
+base = Collection.query.filter(Collection.id == 1).first()
+user = User.query.filter(User.id == 1).first()
+collection = Collection(name="lymedata2", user=user, collection=base)
+
+
+db.session.add_all([collection])
+db.session.commit()
+
