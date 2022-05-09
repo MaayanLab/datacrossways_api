@@ -48,7 +48,9 @@ def print_table(table_name):
         print(tavnit % row)
     print(separator)
 
-print_table("users")
-#print_table("files")
-print_table("roles")
-print_table("user_roles")
+#print_table("users")
+print_table("files")
+#print_table("roles")
+#print_table("user_roles")
+
+print_table("collections")
