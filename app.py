@@ -84,10 +84,23 @@ def api():
         'name': 'Hello World!'
     }
 
-@app.route('/api/createuser', methods = ["GET"])
+
+# User API endpoints
+# - user [GET] -> list all users
+# - user [POST]-> create a new user
+# - user [PATCH] -> update user
+# - user [DELETE] -> delete user
+@app.route('/api/user', methods = ["GET"])
 @login_required
 @admin_required
-def adduser():
+def get_user():
+    users = dbutils.list_users()
+    return jsonify(users)
+
+@app.route('/api/user', methods = ["POST"])
+@login_required
+@admin_required
+def post_user():
     user_info = {
         "name": "Hans Schnitzel",
         "first_name": "Hansi",
@@ -97,20 +110,114 @@ def adduser():
     user = dbutils.create_user(user_info)
     return jsonify(user)
 
-@app.route('/')
+@app.route('/api/user', methods = ["PATCH"])
 @login_required
-def hello_world():
-    fname= dict(session)["user"]["first_name"]
-    result = f'Hello {fname}!'
-    result = result+"<hr><br>"+"<a href=\"api/listfiles\">list my files</a>"
-    result = result+"<br>"+"<a href=\"api/listusers\">list all users</a>"
-    return f'Hello {fname}!'
+@admin_required
+def patch_user():
+    user = request.get_json()
+    print(user)
+    dbutils.update_user(db, user, session["user"]["id"])
+    return jsonify(user)
 
+@app.route('/api/user', methods = ["DELETE"])
+def delete_user():
+    return jsonify({"mode": "DELETE"})
+# ------------------- end user -------------------
+
+# File API endpoints
+# - file [GET] -> list all files
+# - file [POST]-> create a new file
+# - file [PATCH] -> update file
+# - file [DELETE] -> delete file
+@app.route('/api/file', methods = ["GET"])
+@login_required
+@admin_required
+def get_file():
+    files = dbutils.list_all_files()
+    return jsonify(files)
+
+@app.route('/api/file', methods = ["POST"])
+def post_file():
+    return jsonify({"mode": "POST"})
+
+@app.route('/api/file', methods = ["PATCH"])
+@login_required
+@admin_required
+def patch_file():
+    file = request.get_json()
+    print(file)
+    print(file["display_name"])
+    dbutils.update_file(db, file, session["user"]["id"])
+    return jsonify({"done": "ok"})
+
+@app.route('/api/file', methods = ["DELETE"])
+def delete_file():
+    return jsonify({"mode": "DELETE"})
+# ------------------- end file -------------------
+
+# Role API endpoints
+# - user [GET] -> list all roles
+# - user [POST]-> create a new role
+# - user [PATCH] -> update role
+# - user [DELETE] -> delete role
+@app.route('/api/role', methods = ["GET"])
+@login_required
+@admin_required
+def get_role():
+    roles = dbutils.list_roles()
+    return jsonify(roles)
+
+@app.route('/api/role', methods = ["POST"])
+def post_role():
+    return jsonify({"mode": "POST"})
+
+@app.route('/api/role', methods = ["PATCH"])
+def patch_role():
+    return jsonify({"mode": "PATCH"})
+
+@app.route('/api/role', methods = ["DELETE"])
+def delete_role():
+    return jsonify({"mode": "DELETE"})
+# ------------------- end role -------------------
+
+# Collection API endpoints
+# - user [GET] -> list all roles
+# - user [POST]-> create a new role
+# - user [PATCH] -> update role
+# - user [DELETE] -> delete role
+@app.route('/api/collection', methods = ["GET"])
+@login_required
+@admin_required
+def get_collection():
+    collections = dbutils.list_collections()
+    return jsonify(collections)
+
+@app.route('/api/collection', methods = ["POST"])
+def post_collection():
+    return jsonify({"mode": "POST"})
+
+@app.route('/api/collection', methods = ["PATCH"])
+def patch_collection():
+    return jsonify({"mode": "PATCH"})
+
+@app.route('/api/collection', methods = ["DELETE"])
+def delete_collection():
+    return jsonify({"mode": "DELETE"})
+# ------------------- end role -------------------
+
+# ------------------ Login/Logout ----------------
 @app.route('/login')
 def login():
     google = oauth.create_client('google')  # create the google oauth client
     redirect_uri = url_for('authorize', _external=True)
     return google.authorize_redirect(redirect_uri)
+
+@app.route('/logout')
+@login_required
+def logout():
+    for key in list(session.keys()):
+        session.pop(key)
+    return redirect('/')
 
 @app.route('/authorize')
 def authorize():
@@ -124,66 +231,10 @@ def authorize():
     #return redirect('/')
     return redirect('http://localhost:5000/admin')
 
-@app.route('/logout')
-@login_required
-def logout():
-    for key in list(session.keys()):
-        session.pop(key)
-    return redirect('/')
+# ------------------- end login -------------------
 
-@app.route('/api/updateuser', methods = ['POST'])
-@login_required
-@admin_required
-def update_user():
-    user = request.get_json()
-    print(user)
-    dbutils.update_user(db, user, session["user"]["id"])
-    return jsonify(file)
 
-@app.route('/api/updatefile', methods = ['POST'])
-@login_required
-@admin_required
-def update_file():
-    file = request.get_json()
-    print(file)
-    print(file["display_name"])
-    dbutils.update_file(db, file, session["user"]["id"])
-    #file = dbutils.update_user(db, user, session["user"]["id"])
-    return jsonify({"done": "ok"})
-
-@app.route('/api/listfiles', methods = ['GET'])
-@login_required
-def list_user_files():
-    files = dbutils.list_user_files(session["user"]["id"])
-    return jsonify(files)
-
-@app.route('/api/listallfiles', methods = ['GET'])
-@login_required
-@admin_required
-def list_all_files():
-    files = dbutils.list_all_files()
-    return jsonify(files)
-
-@app.route('/api/listusers', methods = ['GET'])
-@login_required
-@admin_required
-def list_users():
-    users = dbutils.list_users()
-    return jsonify(users)
-
-@app.route('/api/listroles', methods = ['GET'])
-@login_required
-@admin_required
-def list_roles():
-    roles = dbutils.list_roles()
-    return jsonify(roles)
-
-@app.route('/api/listcollections', methods = ['GET'])
-@login_required
-@admin_required
-def list_collections():
-    collections = dbutils.list_collections()
-    return jsonify(collections)
+# ------------------ File Upload ------------------
 
 @app.route('/api/download', methods = ['POST'])
 @login_required
@@ -233,6 +284,9 @@ def completemultipart():
     s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
     res = {'status': 'ok'}
     return jsonify(res)
+
+
+# ----------- Proxy to next.js frontend -----------
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
