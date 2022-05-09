@@ -3,6 +3,8 @@ from authlib.integrations.flask_client import OAuth
 import json
 from flask_cors import CORS
 
+import traceback
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from models import db, User, File, Collection, Role, UserRole
@@ -78,13 +80,6 @@ oauth.register(
 )
 
 
-@app.route('/api', methods = ["GET"])
-def api():
-    return {
-        'name': 'Hello World!'
-    }
-
-
 # User API endpoints
 # - user [GET] -> list all users
 # - user [POST]-> create a new user
@@ -94,18 +89,30 @@ def api():
 @login_required
 @admin_required
 def get_user():
-    users = dbutils.list_users()
-    return jsonify(users)
+    try:
+        users = dbutils.list_users()
+        return jsonify(users), 200
+    except Exception:
+        return jsonify(message="An error occurred when listing users"), 500
+
+@app.route('/api/user/files', methods = ["GET"])
+@login_required
+def get_user_files():
+    try:
+        files = dbutils.list_user_files(session["user"]["id"])
+        return jsonify(files), 200
+    except Exception:
+        return jsonify(message="An error occurred when listing users"), 500
 
 @app.route('/api/user', methods = ["POST"])
 @login_required
 @admin_required
 def post_user():
     user_info = {
-        "name": "Hans Schnitzel",
-        "first_name": "Hansi",
-        "last_name": "Schnitzel",
-        "email": "hansi@schnitzel.de"
+        "name": "Megan Wojciechowicz",
+        "first_name": "Megan",
+        "last_name": "Wojciechowicz",
+        "email": "megan.Wojciechowicz@mssm.edu"
     }
     user = dbutils.create_user(user_info)
     return jsonify(user)
@@ -115,9 +122,11 @@ def post_user():
 @admin_required
 def patch_user():
     user = request.get_json()
-    print(user)
-    dbutils.update_user(db, user, session["user"]["id"])
-    return jsonify(user)
+    try:
+        dbutils.update_user(db, user, session["user"]["id"])
+        return jsonify(user), 203
+    except Exception:
+        return jsonify(message="An error occurred when updating user"), 500
 
 @app.route('/api/user', methods = ["DELETE"])
 def delete_user():
@@ -230,6 +239,14 @@ def authorize():
     # do something with the token and profile
     #return redirect('/')
     return redirect('http://localhost:5000/admin')
+
+@app.route('/api/i')
+@login_required
+def mycred():
+    try:
+        return jsonify(session["user"]), 200
+    except Exception:
+        return jsonify(message="An error occurred when updating user"), 500
 
 # ------------------- end login -------------------
 
