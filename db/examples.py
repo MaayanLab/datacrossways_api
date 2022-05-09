@@ -109,10 +109,48 @@ db.session.commit()
 from app import db, User, File, Collection, Role, UserRole
 
 base = Collection.query.filter(Collection.id == 1).first()
-user = User.query.filter(User.id == 1).first()
+user = User.query.filter(User.id == 3).first()
 collection = Collection(name="lymedata2", user=user, collection=base)
 
 
 db.session.add_all([collection])
+db.session.commit()
+
+
+from app import db, User, File, Collection, Role, UserRole
+base = Collection.query.filter(Collection.parent_collection_id == 1).first()
+print(base)
+
+base = Collection.query.filter(Collection.parent_collection_id == 2).first()
+print(base)
+
+# ========== roles=============
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+
+db.drop_all()
+db.create_all()
+
+user = User(name='Alexander Lachmann', 
+                first_name="Alexander", 
+                last_name="Lachmann",
+                affiliation="Mount Sinai Hospital",
+                email="test@test.com")
+
+base_col = Collection(name="root", user=user)
+file = File(name="file.txt", user=user, collection=base_col)
+db.session.add_all([file])
+db.session.commit()
+
+policy = Policy(effect="allow", action="read")
+policy.collections.append(base_col)
+
+policy = Policy(effect="allow", action="admin")
+
+role = Role(name="base reader")
+role.policies.append(policy)
+
+user.roles.append(role)
+
+#db.session.add_all([policy, role])
 db.session.commit()
 

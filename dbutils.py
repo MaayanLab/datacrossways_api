@@ -1,4 +1,4 @@
-from app import db, User, File, Collection, Role, UserRole
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
 import json
 
 def get_user(db, response):
@@ -35,7 +35,7 @@ def create_file(db, file_name, user_id):
     file = File(name=file_name, user=user)
     db.session.add_all([file])
     db.session.commit()
-    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner": file.owner_id}
+    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id}
 
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
@@ -45,17 +45,17 @@ def delete_file(file_id):
 
 def list_all_files():
     #db_files = File.query.order_by(File.id).all()
-    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).all()
+    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).all()
     files = []
     for file in db_files:
-        files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility})
+        files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id})
     return files
 
 def list_user_files(user_id):
     db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).all()
     files = []
     for file in db_files:
-        files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility})
+        files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility})
     return files
 
 def list_users():
@@ -66,13 +66,6 @@ def list_users():
         files = list_user_files(user.id)
         users.append({"id": user.id, "name": user.name, "uuid": user.uuid, "first_name": user.first_name, "last_name": user.last_name, "affiliation": user.affiliation,  "date": user.creation_date, "roles": roles, "files": files, "email": user.email})
     return users
-
-def list_collections():
-    db_collections = Collection.query.order_by(Collection.id).all()
-    collections = []
-    for collection in db_collections:
-        collections.append({"id": collection.id, "name": collection.name, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id})
-    return collections
 
 def get_user_roles(userid):
     roles = []
@@ -96,27 +89,56 @@ def update_user(db, user, updater_id):
     db_user.email = user["email"]
     db_user.affiliation = user["affiliation"]
 
-    newroles = []
-    for r in user["roles"]:
-        if user["roles"][r]:
-            newroles.append(r)
-
     for role in db_user.roles:
-        if role.name not in newroles:
-            db_user.roles.remove(role)
+        db_user.roles.remove(role)
     
-    for role_name in newroles:
-        role = Role.query.filter(Role.name==role_name).first()
+    for role in user["roles"]:
+        role = Role.query.filter(Role.name==role["name"]).first()
         if role not in db_user.roles:
             db_user.roles.append(role)
 
     db.session.commit()
 
+
+def list_collections():
+    db_collections = db.session.query(Collection, User.name).filter(Collection.owner_id == User.id).order_by(Collection.id).all()
+    
+    #db_collections = Collection.query.order_by(Collection.id).all()
+    collections = []
+    for collection in db_collections:
+        collections.append({"id": collection[0].id, "name": collection[0].name, "uuid": collection[0].uuid, "parent_collection_id": collection[0].parent_collection_id, "date": collection[0].creation_date, "owner_id": collection[0].owner_id, "owner_name": collection[1]})
+    return collections
+
+
 def update_file(db, file, updater_id):
     db_file = db.session.query(File).filter(File.id == file["id"]).first()
     db_file.display_name = file["display_name"]
-    db_file.owner_id = file["owner"]
-    #db_file.collection = file["collection"]
+    db_file.owner_id = file["owner_id"]
+    db_file.collection_id = file["collection_id"]
     db_file.visibility = file["visibility"]
     db_file.accessibility = file["accessibility"]
     db.session.commit()
+
+
+def list_policies():
+    db_policies = db.session.query(Policy).order_by(Policy.id).all()
+    policies = []
+
+    for policy in db_policies:
+        
+        file_res = db.session.query(File, PolicyFiles).filter(PolicyFiles.policy_id == policy.id).filter(File.id == PolicyFiles.file_id).all()
+        files = []
+        for file in file_res:
+            print(file)
+            files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].name, "uuid": file[0].uuid})
+        
+        collection_res = db.session.query(Collection, PolicyCollections).filter(PolicyCollections.policy_id == policy.id).filter(Collection.id == PolicyCollections.collection_id).all()
+        collections = []
+        for collection in collection_res:
+            print("----")
+            print(collection)
+            print("----")
+            collections.append({"id": collection[0].id, "name": collection[0].name, "uuid": collection[0].uuid})
+        policies.append({"id": policy.id, "effect": policy.effect, "action": policy.action, "creation_date": policy.creation_date, "files": files, "collections": collections})
+    
+    return policies

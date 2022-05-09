@@ -5,7 +5,7 @@ from flask_cors import CORS
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from models import db, User, File, Collection, Role, UserRole
+from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
 
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_login import (
@@ -138,7 +138,7 @@ def update_user():
     user = request.get_json()
     print(user)
     dbutils.update_user(db, user, session["user"]["id"])
-    return jsonify(file)
+    return jsonify(user)
 
 @app.route('/api/updatefile', methods = ['POST'])
 @login_required
@@ -194,6 +194,15 @@ def download():
     res = {'status': 'ok', 'response': response}
     return jsonify(res)
 
+# ============== policies ============
+@app.route('/api/policies', methods = ['GET'])
+@login_required
+@admin_required
+def list_policies():
+    policies = dbutils.list_policies()
+    return jsonify(policies)
+
+# ============== file upload functions ===============
 @app.route('/api/upload', methods = ['POST'])
 @login_required
 @upload_credentials

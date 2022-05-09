@@ -14,6 +14,51 @@ def generate_uuid():
 def default_name(context):
     return context.get_current_parameters()['name']
 
+
+class PolicyCollections(db.Model):
+    __tablename__ = 'policy_collections'
+    id = db.Column(db.Integer(), primary_key=True)
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', ondelete='CASCADE'))
+
+class PolicyFiles(db.Model):
+    __tablename__ = 'policy_files'
+    id = db.Column(db.Integer(), primary_key=True)
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+    file_id = db.Column(db.Integer(), db.ForeignKey('files.id', ondelete='CASCADE'))
+
+# Define the UserRoles association table
+class UserRole(db.Model):
+    __tablename__ = 'user_roles'
+    id = db.Column(db.Integer(), primary_key=True)
+    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
+
+    def __repr__(self):
+        return f"{self.id}-{self.user_id}-{self.role_id}"
+
+class RolePolicy(db.Model):
+    __tablename__ = 'role_policy'
+    id = db.Column(db.Integer(), primary_key=True)
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+
+
+class Policy(db.Model):
+    __tablename__ = 'policies'
+    id = db.Column(db.Integer(), primary_key=True)
+
+    # should be usually allow, but could be Deny
+    effect = db.Column(db.String(10))
+
+    # e.g. list/read/write
+    action = db.Column(db.String(100))
+
+    creation_date = db.Column(db.DateTime, default=datetime.now)
+
+    collections = db.relationship('Collection', secondary='policy_collections', cascade='all, delete')
+    files = db.relationship('File', secondary='policy_files', cascade='all, delete')
+
 class User(db.Model):
     __tablename__ = 'users'
     
@@ -29,7 +74,7 @@ class User(db.Model):
     # relationships
     file_id = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
     collection_id = db.relationship('Collection', cascade='all, delete', backref='user', lazy=True)
-    roles = db.relationship('Role', secondary='user_roles')
+    roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
 
     def __init__(self, name, first_name, last_name, email, affiliation=""):
         self.name = name
@@ -84,8 +129,7 @@ class Collection(db.Model):
     # relationships
     children = db.relationship('Collection', cascade='all, delete', backref=db.backref('parent', remote_side=[id]), lazy=True)
     child_file_id = db.relationship('File', cascade='all, delete', backref='collection', lazy=True)
-    #file_id = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
-
+    
     def __repr__(self):
         return f"{self.id}-{self.name}-{self.uuid}"
 
@@ -95,31 +139,17 @@ class Collection(db.Model):
                 setattr(self, key, value)
 
 # Define the Role data-model
+# Roles have resources and permissions attached to them
+# {
+#     'id': Integer,
+#     'name': String,
+#     'permissions': [permission_ids],
+#     'resources': [resource_ids]
+# }
 class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer(), primary_key=True)
-    name = db.Column(db.String(100), unique=True)
-    #permission = db.Column(db.String(10), unique=True)
-
+    name = db.Column(db.String(200), unique=True)
+    policies = db.relationship('Policy', secondary='role_policy', cascade='all, delete')
     def __repr__(self):
         return f"{self.id}-{self.name}"
-
-# Define the UserRoles association table
-class UserRole(db.Model):
-    __tablename__ = 'user_roles'
-    id = db.Column(db.Integer(), primary_key=True)
-    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
-    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
-
-    def __repr__(self):
-        return f"{self.id}-{self.user_id}-{self.role_id}"
-
-# Define the UserRoles association table
-class CollectionRole(db.Model):
-    __tablename__ = 'collection_roles'
-    id = db.Column(db.Integer(), primary_key=True)
-    collection_id = db.Column(db.Integer(), db.ForeignKey('collection.id', ondelete='CASCADE'))
-    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
-
-    def __repr__(self):
-        return f"{self.id}-{self.collection_id}-{self.role_id}"
