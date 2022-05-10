@@ -21,3 +21,9 @@ urllib3==1.25.8
 Werkzeug==1.0.1
 Flask-WTF
 Flask-Login
+flask_sqlalchemy
+flask_migrate
+shortuuid
+flask_wtf
+flask_login
+psycopg2-binary

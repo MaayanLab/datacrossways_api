@@ -82,20 +82,16 @@ def append_role(user_id, role_name):
     db.session.commit()
 
 def update_user(db, user, updater_id):
-    print(user["id"])
     db_user = db.session.query(User).filter(User.id == user["id"]).first()
     db_user.firstname = user["first_name"]
     db_user.lastname = user["last_name"]
     db_user.email = user["email"]
     db_user.affiliation = user["affiliation"]
-
-    for role in db_user.roles:
-        db_user.roles.remove(role)
     
-    for role in user["roles"]:
-        role = Role.query.filter(Role.name==role["name"]).first()
-        if role not in db_user.roles:
-            db_user.roles.append(role)
+    db_user.roles = []
+    for role in db.roles:
+        role = Role.query.filter(Role.id==role.id).first()
+        db_user.roles.append(role)
 
     db.session.commit()
 
