@@ -136,10 +136,17 @@ def patch_user():
     except Exception:
         return jsonify(message="An error occurred when updating user"), 500
 
+@admin_required
+@login_required
 @app.route('/api/user', methods = ["DELETE"])
 @accesskey_login
 def delete_user():
-    return jsonify({"mode": "DELETE"})
+    user = request.get_json()
+    try:
+        dbutils.delete_user(db, user, session["user"]["id"])
+        return jsonify(user), 203
+    except Exception:
+        return jsonify(message="An error occurred when updating user"), 500
 # ------------------- end user -------------------
 
 # File API endpoints
