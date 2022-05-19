@@ -1,5 +1,25 @@
 import boto3
 import json
+import app
+
+def delete_file(file_uuid, file_name):
+    print(file_uuid)
+    print(file_name)
+    s3_client = get_aws_client(app.conf["aws"])
+    s3_client.delete_objects(
+        Bucket='mssm-test',
+        Delete={
+            'Objects': [
+                {
+                    'Key': file_uuid+"/"+file_name
+                },
+                {
+                    'Key': '8NbxBTgtowEu'
+                },
+            ],
+            'Quiet': True
+        }
+    )
 
 def get_aws_client(cred):
     s3_client = boto3.client(

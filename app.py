@@ -7,7 +7,7 @@ import traceback
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_login import (
@@ -28,7 +28,7 @@ import s3utils
 
 from flask import Response
 
-from middleware import login_required, upload_credentials, admin_required
+from middleware import login_required, upload_credentials, admin_required, accesskey_login
 
 # dotenv setup
 from dotenv import load_dotenv
@@ -79,6 +79,10 @@ oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
 )
 
+@app.route('/api/testkey', methods = ["GET"])
+@accesskey_login
+def test_me():
+    return jsonify(message="ok")
 
 # User API endpoints
 # - user [GET] -> list all users
@@ -86,6 +90,7 @@ oauth.register(
 # - user [PATCH] -> update user
 # - user [DELETE] -> delete user
 @app.route('/api/user', methods = ["GET"])
+@accesskey_login
 @login_required
 @admin_required
 def get_user():
@@ -96,6 +101,7 @@ def get_user():
         return jsonify(message="An error occurred when listing users"), 500
 
 @app.route('/api/user/files', methods = ["GET"])
+@accesskey_login
 @login_required
 def get_user_files():
     try:
@@ -105,6 +111,7 @@ def get_user_files():
         return jsonify(message="An error occurred when listing users"), 500
 
 @app.route('/api/user', methods = ["POST"])
+@accesskey_login
 @login_required
 @admin_required
 def post_user():
@@ -118,6 +125,7 @@ def post_user():
     return jsonify(user)
 
 @app.route('/api/user', methods = ["PATCH"])
+@accesskey_login
 @login_required
 @admin_required
 def patch_user():
@@ -129,6 +137,7 @@ def patch_user():
         return jsonify(message="An error occurred when updating user"), 500
 
 @app.route('/api/user', methods = ["DELETE"])
+@accesskey_login
 def delete_user():
     return jsonify({"mode": "DELETE"})
 # ------------------- end user -------------------
@@ -139,29 +148,38 @@ def delete_user():
 # - file [PATCH] -> update file
 # - file [DELETE] -> delete file
 @app.route('/api/file', methods = ["GET"])
+@accesskey_login
 @login_required
 @admin_required
 def get_file():
     files = dbutils.list_all_files()
     return jsonify(files)
 
-@app.route('/api/file', methods = ["POST"])
-def post_file():
-    return jsonify({"mode": "POST"})
-
 @app.route('/api/file', methods = ["PATCH"])
+@accesskey_login
 @login_required
 @admin_required
 def patch_file():
     file = request.get_json()
-    print(file)
     print(file["display_name"])
     dbutils.update_file(db, file, session["user"]["id"])
     return jsonify({"done": "ok"})
 
-@app.route('/api/file', methods = ["DELETE"])
-def delete_file():
-    return jsonify({"mode": "DELETE"})
+@app.route('/api/file/<int:file_id>', methods = ["DELETE"])
+@accesskey_login
+@login_required
+def delete_file(file_id):
+    print(file_id)
+    try:
+        user = dict(session).get('user', None)
+        res = dbutils.delete_file(file_id, user)
+        if res == 1: 
+            return jsonify({"action": "file deleted", "file": file_id}), 200
+        else:
+            return jsonify(message="No permission to delete file"), 500
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when deleting file"), 500
 # ------------------- end file -------------------
 
 # Role API endpoints
@@ -170,6 +188,7 @@ def delete_file():
 # - user [PATCH] -> update role
 # - user [DELETE] -> delete role
 @app.route('/api/role', methods = ["GET"])
+@login_required
 @login_required
 @admin_required
 def get_role():
@@ -196,6 +215,7 @@ def delete_role():
 # - user [DELETE] -> delete role
 @app.route('/api/collection', methods = ["GET"])
 @login_required
+@login_required
 @admin_required
 def get_collection():
     collections = dbutils.list_collections()
@@ -212,6 +232,42 @@ def patch_collection():
 @app.route('/api/collection', methods = ["DELETE"])
 def delete_collection():
     return jsonify({"mode": "DELETE"})
+# ------------------- end collection -------------------
+
+# Accesskey API endpoints
+# - user [GET] -> list all roles
+# - user [POST]-> create a new role
+# - user [DELETE] -> delete role
+@app.route('/api/accesskey', methods = ["GET"])
+@accesskey_login
+@login_required
+def get_access_keys():
+    user = dict(session).get('user', None)
+    access_keys = dbutils.list_user_access_keys(user["id"])
+    return jsonify(access_keys)
+
+@app.route('/api/accesskey/<int:expiration>', methods = ["POST"])
+@accesskey_login
+@login_required
+def post_access_key(expiration):
+    user = dict(session).get('user', None)
+    dbutils.create_access_key(user["id"], expiration)
+    return jsonify({"mode": "POST"})
+
+@app.route('/api/accesskey/<int:akey>', methods = ["DELETE"])
+@login_required
+def delete_access_key(akey):
+    try:
+        user = dict(session).get('user', None)
+        res = dbutils.delete_access_key(user["id"], akey)
+        if res == 1: 
+            return jsonify({"action": "key deleted", "key": akey}), 200
+        else:
+            return jsonify(message="No permission to delete key"), 500
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when deleting key"), 500
+
 # ------------------- end role -------------------
 
 # ------------------ Login/Logout ----------------
@@ -222,6 +278,7 @@ def login():
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/logout')
+@accesskey_login
 @login_required
 def logout():
     for key in list(session.keys()):
@@ -238,9 +295,10 @@ def authorize():
     session.permanent = True
     # do something with the token and profile
     #return redirect('/')
-    return redirect('http://localhost:5000/admin')
+    return redirect('http://localhost:5000/myfiles')
 
 @app.route('/api/i')
+@accesskey_login
 @login_required
 def mycred():
     try:
@@ -254,6 +312,7 @@ def mycred():
 # ------------------ File Upload ------------------
 
 @app.route('/api/download', methods = ['POST'])
+@accesskey_login
 @login_required
 def download():
     #data = request.get_json()
@@ -264,6 +323,7 @@ def download():
 
 # ============== policies ============
 @app.route('/api/policies', methods = ['GET'])
+@accesskey_login
 @login_required
 @admin_required
 def list_policies():
@@ -272,6 +332,7 @@ def list_policies():
 
 # ============== file upload functions ===============
 @app.route('/api/upload', methods = ['POST'])
+@accesskey_login
 @login_required
 @upload_credentials
 def upload():
@@ -284,6 +345,7 @@ def upload():
     return jsonify(res)
 
 @app.route('/api/startmultipart', methods = ['POST'])
+@accesskey_login
 @login_required
 @upload_credentials
 def startmultipart():
@@ -294,6 +356,7 @@ def startmultipart():
     return jsonify(res)
 
 @app.route('/api/signmultipart', methods = ['POST'])
+@accesskey_login
 @login_required
 @upload_credentials
 def signmultipart():
@@ -303,6 +366,7 @@ def signmultipart():
     return jsonify(res)
 
 @app.route('/api/completemultipart', methods = ['POST'])
+@accesskey_login
 @login_required
 @upload_credentials
 def completemultipart():

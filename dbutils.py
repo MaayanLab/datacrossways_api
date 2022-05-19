@@ -1,5 +1,27 @@
-from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import json
+import s3utils
+
+def is_admin(user_id):
+    user_roles = get_user_roles(user_id)
+    if "admin" in set(user_roles):
+        return True
+    else:
+        return False
+
+def is_owner_file(user_id, file_id):
+    file = get_file(file_id)
+    if file.owner_id == user_id:
+        return True
+    else:
+        return False
+
+def is_owner_key(user_id, key_id):
+    db_access_key = db.session.query(Accesskey).filter(Accesskey.id == key_id).first()
+    if db_access_key.owner_id == user_id:
+        return True
+    else:
+        return False
 
 def get_user(db, response):
     user_info = response.json()
@@ -40,8 +62,15 @@ def create_file(db, file_name, user_id):
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
 
-def delete_file(file_id):
-    File.query.filter_by(id=file_id).delete()
+def delete_file(file_id, user):
+    if is_admin(user["id"]) or is_owner_file(user["id"], file_id):
+        file = File.query.filter_by(id=file_id).first()
+        s3utils.delete_file(file.uuid, file.name)
+        db.session.delete(file)
+        db.session.commit()
+        return 1
+    else:
+        return 0
 
 def list_all_files():
     #db_files = File.query.order_by(File.id).all()
@@ -138,3 +167,32 @@ def list_policies():
         policies.append({"id": policy.id, "effect": policy.effect, "action": policy.action, "creation_date": policy.creation_date, "files": files, "collections": collections})
     
     return policies
+
+
+def list_user_access_keys(user_id):
+    db_access_keys = db.session.query(Accesskey).filter(Accesskey.owner_id == user_id).order_by(Accesskey.id).all()
+    access_keys = []
+    for key in db_access_keys:
+        access_keys.append({"id": key.id, "expiration_time": key.expiration_time, "creation_date": key.creation_date, "uuid": key.uuid});
+
+    return access_keys
+
+def create_access_key(user_id, expiration_time):
+    user = db.session.query(User).filter(User.id == user_id).first()
+    akey = Accesskey(user=user, expiration_time=expiration_time)
+    db.session.add(akey)
+    db.session.commit()
+
+def delete_access_key(user_id, key_id):
+    if is_admin(user_id) or is_owner_key(user_id, key_id):
+        db_access_key = db.session.query(Accesskey).filter(Accesskey.id == key_id).first()
+        db.session.delete(db_access_key)
+        db.session.commit()
+        return 1
+    else:
+        return 0
+
+def get_key_user(user_key):
+    akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
+    user = db.session.query(User).filter(User.id == akey.owner_id).first()
+    return user

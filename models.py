@@ -11,6 +11,12 @@ def generate_uuid(self):
 def generate_uuid():
     return str(shortuuid.ShortUUID().random(length=12))
 
+def generate_key(self):
+    return str(shortuuid.ShortUUID().random(length=32))
+
+def generate_key():
+    return str(shortuuid.ShortUUID().random(length=32))
+
 def default_name(context):
     return context.get_current_parameters()['name']
 
@@ -75,6 +81,7 @@ class User(db.Model):
     file_id = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
     collection_id = db.relationship('Collection', cascade='all, delete', backref='user', lazy=True)
     roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
+    key_id = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
 
     def __init__(self, name, first_name, last_name, email, affiliation=""):
         self.name = name
@@ -153,3 +160,13 @@ class Role(db.Model):
     policies = db.relationship('Policy', secondary='role_policy', cascade='all, delete')
     def __repr__(self):
         return f"{self.id}-{self.name}"
+
+class Accesskey(db.Model):
+    __tablename__ = 'accesskey'
+    
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String())
+    uuid = db.Column(db.String(), default=generate_key)
+    creation_date = db.Column(db.DateTime, default=datetime.now)
+    expiration_time = db.Column(db.Integer, default=1440)
+    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))

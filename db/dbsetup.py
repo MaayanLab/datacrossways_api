@@ -65,3 +65,5 @@ lyme_lister.policies.append(policy_3)
 user_2.roles.append(base_reader)
 
 db.session.commit()
+
+

@@ -154,3 +154,28 @@ user.roles.append(role)
 #db.session.add_all([policy, role])
 db.session.commit()
 
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+
+uploader_role = Role(name="upload")
+db.session.add_all([uploader_role])
+db.session.commit()
+
+
+
+# create a key for user 1
+
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+
+db_user = db.session.query(User).filter(User.id == 1).first()
+akey = Accesskey(name="adminkey", user=db_user)
+
+db.session.commit()
+
+k = Accesskey.query.filter(Accesskey.id == 1).first()
+k.owner_id
+
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+
