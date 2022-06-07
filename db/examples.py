@@ -179,3 +179,35 @@ k.owner_id
 
 from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 
+userid = 3
+
+import time
+
+
+t = time.time()
+res = db.session.query(User, Policy, Role, UserRole, RolePolicy, PolicyCollections, Collection).all()
+print(time.time()-t)
+
+from sqlalchemy.orm import joinedload
+
+t = time.time()
+res = db.session.query(User).options(
+    joinedload(User.collection_id).
+    subqueryload(Collection.child_file_id)).all()
+print(time.time()-t)
+
+t = time.time()
+res = db.session.query(User).options(
+    joinedload(User.collection_id).
+    subqueryload(Collection.child_file_id)).all()
+print(time.time()-t)
+
+
+t = time.time()
+res = db.session.query(User, Policy, Role, UserRole, RolePolicy, PolicyCollections, Collection).filter(User.id == userid).filter(UserRole.user_id == userid).filter(UserRole.role_id == Role.id).filter(Role.id == RolePolicy.role_id).filter(Policy.id == RolePolicy.policy_id).filter(PolicyCollections.policy_id == Policy.id).filter(Collection.id == PolicyCollections.collection_id).all()
+print(time.time()-t)
+
+for u, p, r, ur, rp, pc, c in res:
+    print(c.name+" - "+p.action)
+
+db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all()

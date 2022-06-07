@@ -77,3 +77,8 @@ def complete_multipart(filename, upload_id, parts, cred):
         Key=filename,
         MultipartUpload={'Parts': parts},
         UploadId=upload_id)
+
+def get_file_size(filename):
+    s3_client = get_aws_client(app.conf["aws"])
+    response = s3_client.head_object(Bucket='mssm-test', Key='kWbmk5955QM7/kallisto')
+    return response['ContentLength']

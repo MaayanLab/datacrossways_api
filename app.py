@@ -222,11 +222,17 @@ def delete_role():
 # - user [DELETE] -> delete role
 @app.route('/api/collection', methods = ["GET"])
 @login_required
-@login_required
 @admin_required
-def get_collection():
+def get_collections():
     collections = dbutils.list_collections()
     return jsonify(collections)
+
+@app.route('/api/collection/<int:collection_id>', methods = ["GET"])
+@login_required
+def get_collection(collection_id):
+    collection = dbutils.get_collection(collection_id)
+    return jsonify(collection)
+
 
 @app.route('/api/collection', methods = ["POST"])
 def post_collection():
@@ -298,7 +304,10 @@ def authorize():
     token = google.authorize_access_token()
     response = google.get('userinfo', token=token)
     user = dbutils.get_user(db, response)
+    user.admin = dbutils.is_admin(user.id)
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+    if user.admin:
+        session["user"]["admin"] = user.admin
     session.permanent = True
     # do something with the token and profile
     #return redirect('/')
@@ -316,14 +325,15 @@ def mycred():
 # ------------------- end login -------------------
 
 
-# ------------------ File Upload ------------------
+# ------------------ File Download ------------------
 
-@app.route('/api/download', methods = ['POST'])
+@app.route('/api/file/download/<int:fileid>', methods = ['GET'])
 @accesskey_login
 @login_required
-def download():
+def download(fileid):
     #data = request.get_json()
-    db_file = dbutils.get_file(12)
+    db_file = dbutils.get_file(fileid)
+    print(db_file)
     response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
     res = {'status': 'ok', 'response': response}
     return jsonify(res)
@@ -344,7 +354,7 @@ def list_policies():
 @upload_credentials
 def upload():
     data = request.get_json()
-    db_file = dbutils.create_file(db, data["filename"], session["user"]["id"])
+    db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
     # check whether user has rights to upload data
     # general upload rights, resource write credentials (e.g. user is allowed to write)
     response = s3utils.sign_upload_file(db_file["uuid"]+"/"+data["filename"], conf["aws"])
@@ -357,7 +367,7 @@ def upload():
 @upload_credentials
 def startmultipart():
     data = request.get_json()
-    db_file = dbutils.create_file(db, data["filename"], session["user"]["id"])
+    db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
     response = s3utils.start_multipart(db_file["uuid"]+"/"+data["filename"], conf["aws"])
     res = {'status': 'ok', 'upload_id': response, 'uuid': db_file["uuid"]}
     return jsonify(res)

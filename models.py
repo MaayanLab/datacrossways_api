@@ -21,49 +21,6 @@ def default_name(context):
     return context.get_current_parameters()['name']
 
 
-class PolicyCollections(db.Model):
-    __tablename__ = 'policy_collections'
-    id = db.Column(db.Integer(), primary_key=True)
-    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
-    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', ondelete='CASCADE'))
-
-class PolicyFiles(db.Model):
-    __tablename__ = 'policy_files'
-    id = db.Column(db.Integer(), primary_key=True)
-    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
-    file_id = db.Column(db.Integer(), db.ForeignKey('files.id', ondelete='CASCADE'))
-
-# Define the UserRoles association table
-class UserRole(db.Model):
-    __tablename__ = 'user_roles'
-    id = db.Column(db.Integer(), primary_key=True)
-    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
-    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
-
-    def __repr__(self):
-        return f"{self.id}-{self.user_id}-{self.role_id}"
-
-class RolePolicy(db.Model):
-    __tablename__ = 'role_policy'
-    id = db.Column(db.Integer(), primary_key=True)
-    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
-    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
-
-
-class Policy(db.Model):
-    __tablename__ = 'policies'
-    id = db.Column(db.Integer(), primary_key=True)
-
-    # should be usually allow, but could be Deny
-    effect = db.Column(db.String(10))
-
-    # e.g. list/read/write
-    action = db.Column(db.String(100))
-
-    creation_date = db.Column(db.DateTime, default=datetime.now)
-
-    collections = db.relationship('Collection', secondary='policy_collections', cascade='all, delete')
-    files = db.relationship('File', secondary='policy_files', cascade='all, delete')
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -112,6 +69,7 @@ class File(db.Model):
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="locked")
     creation_date = db.Column(db.DateTime, default=datetime.now)
+    size = db.Column(db.Integer(), default=0)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
     collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
     
@@ -129,6 +87,8 @@ class Collection(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     name = db.Column(db.String())
     uuid = db.Column(db.String(), default=generate_uuid)
+    description = db.Column(db.String())
+    image_url = db.Column(db.String(), default="https://datacrosswayspublic.s3.amazonaws.com/collections/collection.jpg")
     creation_date = db.Column(db.DateTime, default=datetime.now)
     parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
@@ -144,6 +104,18 @@ class Collection(db.Model):
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+
+
+class Accesskey(db.Model):
+    __tablename__ = 'accesskey'
+    
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String())
+    uuid = db.Column(db.String(), default=generate_key)
+    creation_date = db.Column(db.DateTime, default=datetime.now)
+    expiration_time = db.Column(db.Integer, default=1440)
+    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
+
 
 # Define the Role data-model
 # Roles have resources and permissions attached to them
@@ -161,12 +133,45 @@ class Role(db.Model):
     def __repr__(self):
         return f"{self.id}-{self.name}"
 
-class Accesskey(db.Model):
-    __tablename__ = 'accesskey'
-    
-    id = db.Column(db.Integer, primary_key = True)
-    name = db.Column(db.String())
-    uuid = db.Column(db.String(), default=generate_key)
+class PolicyCollections(db.Model):
+    __tablename__ = 'policy_collections'
+    id = db.Column(db.Integer(), primary_key=True)
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', ondelete='CASCADE'))
+
+class PolicyFiles(db.Model):
+    __tablename__ = 'policy_files'
+    id = db.Column(db.Integer(), primary_key=True)
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+    file_id = db.Column(db.Integer(), db.ForeignKey('files.id', ondelete='CASCADE'))
+
+# Define the UserRoles association table
+class UserRole(db.Model):
+    __tablename__ = 'user_roles'
+    id = db.Column(db.Integer(), primary_key=True)
+    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
+
+    def __repr__(self):
+        return f"{self.id}-{self.user_id}-{self.role_id}"
+
+class RolePolicy(db.Model):
+    __tablename__ = 'role_policy'
+    id = db.Column(db.Integer(), primary_key=True)
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+
+class Policy(db.Model):
+    __tablename__ = 'policies'
+    id = db.Column(db.Integer(), primary_key=True)
+
+    # should be usually allow, but could be Deny
+    effect = db.Column(db.String(10))
+
+    # e.g. list/read/write
+    action = db.Column(db.String(100))
+
     creation_date = db.Column(db.DateTime, default=datetime.now)
-    expiration_time = db.Column(db.Integer, default=1440)
-    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
+
+    collections = db.relationship('Collection', secondary='policy_collections', cascade='all, delete')
+    files = db.relationship('File', secondary='policy_files', cascade='all, delete')

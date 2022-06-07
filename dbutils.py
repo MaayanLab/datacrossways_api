@@ -52,12 +52,12 @@ def list_roles():
 
 # ===== files ========
 
-def create_file(db, file_name, user_id):
+def create_file(db, file_name, file_size, user_id):
     user = db.session.query(User).filter(User.id == user_id).first()
-    file = File(name=file_name, user=user)
+    file = File(name=file_name, user=user, size=file_size)
     db.session.add_all([file])
     db.session.commit()
-    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id}
+    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "size": file.size}
 
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
@@ -77,14 +77,14 @@ def list_all_files():
     db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).all()
     files = []
     for file in db_files:
-        files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id})
+        files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id, 'size': file[0].size})
     return files
 
 def list_user_files(user_id):
     db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).all()
     files = []
     for file in db_files:
-        files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility})
+        files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'size': file.size})
     return files
 
 def list_users():
@@ -98,11 +98,15 @@ def list_users():
 
 def get_user_roles(userid):
     roles = []
-    print("user_id: "+str(userid))
     for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
-        roles.append(r.name)
-    roles = list(set(roles))
+        roles.append({r.id, r.name})
+    
+    #for r in roles:
+    #    db.session.query(Role, Policy).filter(Policy.id == ).all()
     return roles
+
+#def get_user_scope(userid):
+
 
 def append_role(user_id, role_name):
     user = db.session.query(User).filter(User.id == user_id).first()
@@ -134,6 +138,25 @@ def list_collections():
         collections.append({"id": collection[0].id, "name": collection[0].name, "uuid": collection[0].uuid, "parent_collection_id": collection[0].parent_collection_id, "date": collection[0].creation_date, "owner_id": collection[0].owner_id, "owner_name": collection[1]})
     return collections
 
+def get_collection(collection_id, user_id):
+    user_roles = get_user_roles(user_id)
+    collection = Collection.query.filter(Collection.id==collection_id).first()
+    sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
+    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
+    
+    sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
+    
+    for sc in sub_collections:
+        num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
+        num_files = File.query.filter(File.collection_id==sc.id).count()
+        temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid, "parent_collection_id": sc.parent_collection_id, "date": sc.creation_date, "owner_id": sc.owner_id, "child_collections": num_collections, "child_files": num_files}
+        collection_return["child_collections"].append(temp_collection)
+    
+    for file in sub_files:
+        temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size}
+        collection_return["child_files"].append(temp_file)
+    
+    return collection_return
 
 def update_file(db, file, updater_id):
     db_file = db.session.query(File).filter(File.id == file["id"]).first()
@@ -143,7 +166,6 @@ def update_file(db, file, updater_id):
     db_file.visibility = file["visibility"]
     db_file.accessibility = file["accessibility"]
     db.session.commit()
-
 
 def list_policies():
     db_policies = db.session.query(Policy).order_by(Policy.id).all()
