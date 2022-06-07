@@ -99,7 +99,8 @@ def list_users():
 def get_user_roles(userid):
     roles = []
     for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
-        roles.append({r.id, r.name})
+        #roles.append({r.id, r.name})
+        roles.append(r.id)
     
     #for r in roles:
     #    db.session.query(Role, Policy).filter(Policy.id == ).all()
