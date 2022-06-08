@@ -211,3 +211,5 @@ for u, p, r, ur, rp, pc, c in res:
     print(c.name+" - "+p.action)
 
 db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all()
+
+db.session.query(User).filter(User.id == userid).join(UserRole, User.id == UserRole.user_id).all()
