@@ -87,6 +87,9 @@ def list_user_files(user_id):
         files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'size': file.size})
     return files
 
+def list_collection_files(user_id):
+    return []
+
 def list_users():
     db_users = User.query.order_by(User.id).all()
     users = []
