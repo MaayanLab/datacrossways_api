@@ -29,8 +29,7 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = dict(session).get('user', None)
-        user_roles = dbutils.get_user_roles(user["id"])
-        if "admin" in set(user_roles):
+        if dbutils.is_admin(user["id"]):
             return f(*args, **kwargs)
         return jsonify({'error': 'You need to be Admin for this operation.'})
     return decorated_function

@@ -4,7 +4,8 @@ import s3utils
 
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
-    if "admin" in set(user_roles):
+    print(user_roles)
+    if 1 in set(user_roles):
         return True
     else:
         return False
@@ -102,11 +103,7 @@ def list_users():
 def get_user_roles(userid):
     roles = []
     for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
-        #roles.append({r.id, r.name})
         roles.append(r.id)
-    
-    #for r in roles:
-    #    db.session.query(Role, Policy).filter(Policy.id == ).all()
     return roles
 
 #def get_user_scope(userid):
