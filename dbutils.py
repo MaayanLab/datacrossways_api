@@ -5,10 +5,10 @@ import s3utils
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
     print(user_roles)
-    if 1 in set(user_roles):
-        return True
-    else:
-        return False
+    for r in user_roles:
+        if r["name"] == "admin":
+            return True
+    return False
 
 def is_owner_file(user_id, file_id):
     file = get_file(file_id)
@@ -103,11 +103,48 @@ def list_users():
 def get_user_roles(userid):
     roles = []
     for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
-        roles.append(r.id)
+        roles.append({"id": r.id, "name": r.name})
+    print(roles)
     return roles
 
-#def get_user_scope(userid):
+""" def get_user_scope(userid):
+    read_cred = []
+    write_cred = []
+    list_cred = []
+    roles = []
+    for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
+        roles.append(r)
+ """
 
+def get_scope(userid):
+    read_cred = []
+    write_cred = []
+    list_cred = []
+    roles = []
+    for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
+        roles.append(r)
+        for p in r.policies:
+            if p.effect == "allow":
+                for c in p.collections:
+                    add_collection_scope(c, p.action, list_cred, read_cred, write_cred)
+    return (set(list_cred), set(read_cred), set(write_cred))
+
+def add_collection_scope(collection, action, list_cred, read_cred, write_cred):
+    for f in collection.child_file_id:
+        if action == "list":
+            list_cred.append(f.uuid)
+        elif action == "write":
+            write_cred.append(f.uuid)
+        elif action == "read":
+            read_cred.append(f.uuid)
+    for c in collection.children:
+        add_collection_scope(c, action, list_cred, read_cred, write_cred)
+        if action == "list":
+            list_cred.append(c.uuid)
+        elif action == "write":
+            write_cred.append(c.uuid)
+        elif action == "read":
+            read_cred.append(c.uuid)
 
 def append_role(user_id, role_name):
     user = db.session.query(User).filter(User.id == user_id).first()
@@ -123,8 +160,8 @@ def update_user(db, user, updater_id):
     db_user.affiliation = user["affiliation"]
     
     db_user.roles = []
-    for role in db.roles:
-        role = Role.query.filter(Role.id==role.id).first()
+    for role in user["roles"]:
+        role = Role.query.filter(Role.id==role["id"]).first()
         db_user.roles.append(role)
 
     db.session.commit()
@@ -141,23 +178,39 @@ def list_collections():
 
 def get_collection(collection_id, user_id):
     user_roles = get_user_roles(user_id)
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
     collection = Collection.query.filter(Collection.id==collection_id).first()
     sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
     collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
-    
     sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
-    
+    print("creds list")
+    print(list_creds)
     for sc in sub_collections:
-        num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
-        num_files = File.query.filter(File.collection_id==sc.id).count()
-        temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid, "parent_collection_id": sc.parent_collection_id, "date": sc.creation_date, "owner_id": sc.owner_id, "child_collections": num_collections, "child_files": num_files}
-        collection_return["child_collections"].append(temp_collection)
-    
+        if sc.uuid in list_creds or sc.visibility == "visible":
+            num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
+            num_files = File.query.filter(File.collection_id==sc.id).count()
+            temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid, "parent_collection_id": sc.parent_collection_id, "date": sc.creation_date, "owner_id": sc.owner_id, "child_collections": num_collections, "child_files": num_files}
+            collection_return["child_collections"].append(temp_collection)
     for file in sub_files:
-        temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size}
-        collection_return["child_files"].append(temp_file)
-    
+        if file.uuid in list_creds or file.visibility == "visible":
+            permissions = ["list"]
+            if file.uuid in read_creds:
+                permissions.append("read")
+            if file.uuid in write_creds:
+                permissions.append("write")
+            temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
+            collection_return["child_files"].append(temp_file)
+    collection_return["path"] = get_parent_collection_path(collection_id)
     return collection_return
+
+def get_parent_collection_path(collection_id):
+    collection_path = []
+    collection = Collection.query.filter(Collection.id==collection_id).first()
+    collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
+    while collection.parent_collection_id:
+        collection = Collection.query.filter(Collection.id==collection.parent_collection_id).first()
+        collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
+    return collection_path
 
 def update_file(db, file, updater_id):
     db_file = db.session.query(File).filter(File.id == file["id"]).first()

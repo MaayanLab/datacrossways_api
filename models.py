@@ -92,6 +92,8 @@ class Collection(db.Model):
     creation_date = db.Column(db.DateTime, default=datetime.now)
     parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
+    visibility = db.Column(db.String(), default="visible")
+    accessibility = db.Column(db.String(), default="open")
 
     # relationships
     children = db.relationship('Collection', cascade='all, delete', backref=db.backref('parent', remote_side=[id]), lazy=True)

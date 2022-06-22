@@ -213,3 +213,40 @@ for u, p, r, ur, rp, pc, c in res:
 db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all()
 
 db.session.query(User).filter(User.id == userid).join(UserRole, User.id == UserRole.user_id).all()
+
+
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+
+userid = 3
+user = db.session.query(User).filter(User.id == userid).first()
+
+def get_scope():
+    read_cred = []
+    write_cred = []
+    list_cred = []
+    roles = []
+    for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
+        roles.append(r)
+        for p in r.policies:
+            if p.effect == "allow":
+                for c in p.collections:
+                    add_collection_scope(c, p.action, list_cred, read_cred, write_cred)
+    return (list_cred, read_cred, write_cred)
+
+def add_collection_scope(collection, action, list_cred, read_cred, write_cred):
+    for f in collection.child_file_id:
+        if action == "list":
+            list_cred.append(f.uuid)
+        elif action == "write":
+            write_cred.append(f.uuid)
+        elif action == "read":
+            read_cred.append(f.uuid)
+    for c in collection.children:
+        add_collection_scope(c, action, list_cred, read_cred, write_cred)
+        if action == "list":
+            list_cred.append(c.uuid)
+        elif action == "write":
+            write_cred.append(c.uuid)
+        elif action == "read":
+            read_cred.append(c.uuid)

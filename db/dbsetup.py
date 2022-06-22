@@ -59,10 +59,22 @@ base_reader.policies.append(policy_2)
 policy_3 = Policy(effect="allow", action="list")
 policy_3.collections.append(root_collection)
 
+
+policy = Policy(effect="allow", action="list")
+policy.collections.append(lyme_collection)
 lyme_lister = Role(name="lyme_lister")
 lyme_lister.policies.append(policy_3)
 
-user_2.roles.append(base_reader)
+policy = Policy(effect="allow", action="read")
+policy.collections.append(lyme_collection)
+lyme_reader = Role(name="lyme_reader")
+lyme_reader.policies.append(policy)
+
+user_2.roles.append(lyme_lister)
+user_1.roles.append(lyme_lister)
+user_1.roles.append(lyme_reader)
+
+db.session.add_all([])
 
 db.session.commit()
 

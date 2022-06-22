@@ -1,3 +1,5 @@
 config.json
 secrets/*
 __py*
+*.bed
+*.sqlite

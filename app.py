@@ -98,6 +98,7 @@ def get_user():
         users = dbutils.list_users()
         return jsonify(users), 200
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when listing users"), 500
 
 @app.route('/api/user/files', methods = ["GET"])
@@ -134,6 +135,7 @@ def patch_user():
         dbutils.update_user(db, user, session["user"]["id"])
         return jsonify(user), 203
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when updating user"), 500
 
 @admin_required
@@ -230,7 +232,8 @@ def get_collections():
 @app.route('/api/collection/<int:collection_id>', methods = ["GET"])
 @login_required
 def get_collection(collection_id):
-    collection = dbutils.get_collection(collection_id)
+    user = dict(session).get('user', None)
+    collection = dbutils.get_collection(collection_id, user["id"])
     return jsonify(collection)
 
 
