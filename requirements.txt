@@ -28,3 +28,4 @@ shortuuid
 flask_wtf
 flask_login
 psycopg2-binary
+pymysql
