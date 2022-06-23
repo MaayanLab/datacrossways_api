@@ -314,7 +314,7 @@ def authorize():
     session.permanent = True
     # do something with the token and profile
     #return redirect('/')
-    return redirect('http://localhost:5000/myfiles')
+    return redirect(conf["api"]["url"]+'/myfiles')
 
 @app.route('/api/i')
 @accesskey_login
@@ -403,7 +403,7 @@ def completemultipart():
 def proxy(*args, **kwargs):
     resp = requests.request(
         method=request.method,
-        url=request.url.replace(request.host_url, 'http://localhost:3000/'),
+        url=request.url.replace(request.host_url, conf["frontend"]["url"]),
         headers={key: value for (key, value) in request.headers if key != 'Host'},
         data=request.get_data(),
         cookies=request.cookies,
