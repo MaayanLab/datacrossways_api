@@ -314,7 +314,7 @@ def authorize():
     session.permanent = True
     # do something with the token and profile
     #return redirect('/')
-    return redirect(conf["api"]["url"]+'/myfiles')
+    return redirect(conf["redirect"]["url"]+'/myfiles')
 
 @app.route('/api/i')
 @accesskey_login
@@ -394,7 +394,6 @@ def completemultipart():
     s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
     res = {'status': 'ok'}
     return jsonify(res)
-
 
 # ----------- Proxy to next.js frontend -----------
 
