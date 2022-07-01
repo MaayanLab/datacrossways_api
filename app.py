@@ -1,38 +1,21 @@
-from flask import Flask, url_for, redirect, session, request, jsonify
-from authlib.integrations.flask_client import OAuth
-import json
-from flask_cors import CORS
 
+
+from flask import Flask, url_for, redirect, session, request, jsonify, Response
 import traceback
-
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
-
-from flask_wtf.csrf import CSRFProtect, generate_csrf
-from flask_login import (
-    LoginManager,
-    UserMixin,
-    current_user,
-    login_required,
-    login_user,
-    logout_user,
-)
-
-
+import json
 import requests
 
-import dbutils
+from authlib.integrations.flask_client import OAuth
 
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+import dbutils
 import s3utils
 
-from flask import Response
-
 from middleware import login_required, upload_credentials, admin_required, accesskey_login
-
-# dotenv setup
-from dotenv import load_dotenv
-load_dotenv()
 
 from datetime import timedelta
 
@@ -55,28 +38,20 @@ conf = read_config()
 app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.session_protection = "strong"
-
 db.init_app(app)
-migrate = Migrate(app, db)
+#migrate = Migrate(app, db)
 app.app_context().push()
 
 #oauth config
 oauth = OAuth(app)
 oauth.register(
     name = "google",
-    client_id = conf["web"]["client_id"],
-    client_secret = conf["web"]["client_secret"],
-    access_token_url = 'https://accounts.google.com/o/oauth2/token',
-    access_token_params = None,
-    authorize_url = 'https://accounts.google.com/o/oauth2/auth',
-    authorize_params = None,
+    client_id = conf["oauth"]["google"]["client_id"],
+    client_secret = conf["oauth"]["google"]["client_secret"],
+    access_token_url = conf["oauth"]["google"]["token_uri"],
+    authorize_url = conf["oauth"]["google"]["auth_uri"],
     api_base_url = 'https://www.googleapis.com/oauth2/v1/',
-    userinfo_endpoint = 'https://openidconnect.googleapis.com/v1/userinfo',  # This is only needed if using openId to fetch user info
-    client_kwargs={'scope': 'openid email profile'},
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
 )
 
 @app.route('/api/testkey', methods = ["GET"])
@@ -311,6 +286,7 @@ def authorize():
     google = oauth.create_client("google")
     token = google.authorize_access_token()
     response = google.get('userinfo', token=token)
+    print(response.content)
     user = dbutils.get_user(db, response)
     user.admin = dbutils.is_admin(user.id)
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
