@@ -198,7 +198,6 @@ def delete_file(file_id):
 # - user [DELETE] -> delete role
 @app.route('/api/role', methods = ["GET"])
 @login_required
-@login_required
 @admin_required
 def get_role():
     roles = dbutils.list_roles()
@@ -283,6 +282,12 @@ def delete_access_key(akey):
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when deleting key"), 500
+
+@app.route('/api/keylogin', methods=["GET"])
+def keylogin():
+    user = dbutils.get_key_user(user_key)
+    session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+    session.permanent = True
 
 # ------------------- end role -------------------
 
