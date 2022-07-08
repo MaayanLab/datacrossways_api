@@ -51,6 +51,42 @@ def create_user(user_info):
 
 # ----------- roles ----------------
 
+def delete_role(role_id):
+    dbrole = db.session.query(Role).filter(Role.id == role_id).first()
+    db.session.delete(dbrole)
+    db.session.commit()
+    return(print_role(dbrole))
+
+def update_role(data):
+    overwrite = False
+    role = data["role"]
+    dbrole = db.session.query(Role).filter(Role.id == role["id"]).first()
+
+    dbpolicies = db.session.query(Policy).all()
+    dbp = []
+    for p in dbpolicies:
+        dbp.append(p.id)
+
+    if "overwrite" in data.keys():
+        overwrite = data["overwrite"]
+
+    if "name" in data["role"].keys():
+        dbrole.name = data["role"]["name"]
+
+    if overwrite:
+        dbrole.policies = []
+        for p in role["policies"]:
+            if p in dbp:
+                pp = db.session.query(Policy).filter(Policy.id == p).first()
+                dbrole.policies.append(pp)
+    else:
+        for p in role["policies"]:
+            if p in dbp and p not in dbrole.policies:
+                pp = db.session.query(Policy).filter(Policy.id == p).first()
+                dbrole.policies.append(pp)
+    db.session.commit()
+    return(print_role(dbrole))
+
 def create_role(role_name, policies=[]):
     if db.session.query(Role).filter(Role.name == role_name).first() is None:
         role = Role(name=role_name)

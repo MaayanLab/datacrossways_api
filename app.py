@@ -290,16 +290,20 @@ def post_role():
 
 @app.route('/api/role', methods = ["PATCH"])
 def patch_role():
-    try: 
-       return jsonify({"message": "role updated"}), 200
+    try:
+        data = request.get_json()
+        role = dbutils.update_role(data)
+        return jsonify({"message": "role updated", "role": role}), 200
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when attempting to update role"), 500
 
 
-@app.route('/api/role/{role_id}', methods = ["DELETE"])
-def delete_role():
-    try: 
-       return jsonify({"message": "role deleted"}), 200
+@app.route('/api/role/<int:role_id>', methods = ["DELETE"])
+def delete_role(role_id):
+    try:
+        role = dbutils.delete_role(role_id)
+        return jsonify({"message": "role deleted", "role": role}), 200
     except Exception:
         return jsonify(message="An error occurred when attempting to delete role"), 500
 
@@ -320,9 +324,12 @@ def get_collections():
 @app.route('/api/collection/<int:collection_id>', methods = ["GET"])
 @login_required
 def get_collection(collection_id):
-    user = dict(session).get('user', None)
-    collection = dbutils.get_collection(collection_id, user["id"])
-    return jsonify(collection)
+    try:
+        user = dict(session).get('user', None)
+        collection = dbutils.get_collection(collection_id, user["id"])
+        return jsonify(collection)
+    except Exception:
+        traceback.print_exc()
 
 
 @app.route('/api/collection', methods = ["POST"])
