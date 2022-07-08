@@ -305,7 +305,9 @@ def delete_role(role_id):
         role = dbutils.delete_role(role_id)
         return jsonify({"message": "role deleted", "role": role}), 200
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when attempting to delete role"), 500
+        
 
 # ------------------- end role -------------------
 

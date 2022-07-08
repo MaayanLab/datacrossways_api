@@ -53,9 +53,10 @@ def create_user(user_info):
 
 def delete_role(role_id):
     dbrole = db.session.query(Role).filter(Role.id == role_id).first()
-    db.session.delete(dbrole)
+    r = print_role(dbrole)
+    Role.query.filter_by(id=role_id).delete()
     db.session.commit()
-    return(print_role(dbrole))
+    return(r)
 
 def update_role(data):
     overwrite = False
@@ -109,9 +110,10 @@ def list_roles():
 
 def print_role(role):
     policies = []
-    for policy in role.policies:
-        pp = print_policy(policy)
-        policies.append(pp)
+    if role.policies is not None:
+        for policy in role.policies:
+            pp = print_policy(policy)
+            policies.append(pp)
     return({"id": role.id, "name": role.name, "policies": policies})
 
 def print_policy(policy):
