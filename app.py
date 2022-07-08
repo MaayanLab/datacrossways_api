@@ -79,7 +79,7 @@ oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
 )
 
-@app.route('/api/testkey', methods = ["GET"])
+@app.route('/api/user/testkey', methods = ["GET"])
 @accesskey_login
 def test_me():
     return jsonify(message="ok")
@@ -161,34 +161,126 @@ def delete_user():
 @login_required
 @admin_required
 def get_file():
-    files = dbutils.list_all_files()
-    return jsonify(files)
+    try:
+        files = dbutils.list_all_files()
+        return jsonify(files)
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing files"), 500
+
+@app.route('/api/file', methods = ["POST"])
+@accesskey_login
+@login_required
+@admin_required
+def post_file():
+    try:
+        data = request.get_json()
+        db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
+        return jsonify(db_file)
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when posting file"), 500
 
 @app.route('/api/file', methods = ["PATCH"])
 @accesskey_login
 @login_required
 @admin_required
 def patch_file():
-    file = request.get_json()
-    print(file["display_name"])
-    dbutils.update_file(db, file, session["user"]["id"])
-    return jsonify({"done": "ok"})
+    try:
+        file = request.get_json()
+        dbutils.update_file(db, file, session["user"]["id"])
+        return jsonify(message="file updated"), 200
+    except Exception:
+        return jsonify(message="An error occurred when updating file"), 500
 
 @app.route('/api/file/<int:file_id>', methods = ["DELETE"])
 @accesskey_login
 @login_required
 def delete_file(file_id):
-    print(file_id)
     try:
         user = dict(session).get('user', None)
         res = dbutils.delete_file(file_id, user)
         if res == 1: 
-            return jsonify({"action": "file deleted", "file": file_id}), 200
+            return jsonify({"message": "File deleted", "file": file_id}), 200
         else:
-            return jsonify(message="No permission to delete file"), 500
+            return jsonify(message="No permission to delete file"), 403
     except Exception:
         traceback.print_exc()
-        return jsonify(message="An error occurred when deleting file"), 500
+        return jsonify(message="An error occurred when attempting to delete file"), 500
+
+@app.route('/api/file/download/<int:fileid>', methods = ['GET'])
+@accesskey_login
+@login_required
+def download(fileid):
+    try:
+        user = dict(session).get('user', None)
+        if dbutils.is_owner_file(user["id"], fileid) or dbutils.is_admin(user["id"]):
+            db_file = dbutils.get_file(fileid)
+            print(db_file)
+            response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
+            return jsonify({"message": "URL signed", "url": response}), 200
+        else:
+            return jsonify(message="No permission to download file"), 403
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to sign URL"), 500
+
+
+
+# ============== file upload functions ===============
+@app.route('/api/file/upload', methods = ['POST'])
+@accesskey_login
+@login_required
+@upload_credentials
+def upload():
+    try:
+        data = request.get_json()
+        db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
+        # check whether user has rights to upload data
+        # general upload rights, resource write credentials (e.g. user is allowed to write)
+        response = s3utils.sign_upload_file(db_file["uuid"]+"/"+data["filename"], conf["aws"])
+        return jsonify({"message": "URL signed", "url": response, "file": db_file}), 200
+    except Exception:
+        return jsonify(message="An error occurred when attempting to sign URL"), 500
+
+@app.route('/api/file/startmultipart', methods = ['POST'])
+@accesskey_login
+@login_required
+@upload_credentials
+def startmultipart():
+    try:
+        data = request.get_json()
+        db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
+        response = s3utils.start_multipart(db_file["uuid"]+"/"+data["filename"], conf["aws"])
+        res = {'status': 'ok', 'upload_id': response, 'uuid': db_file["uuid"]}
+        return jsonify({"message": "multipart upload started", 'upload_id': response, 'uuid': db_file["uuid"]}), 200
+    except Exception: 
+        return jsonify(message="An error occurred when attempting to start multipart upload"), 500
+
+@app.route('/api/file/signmultipart', methods = ['POST'])
+@accesskey_login
+@login_required
+@upload_credentials
+def signmultipart():
+    try:
+        data = request.get_json()
+        url = s3utils.sign_multipart(data["filename"], data["upload_id"], data["part_number"], conf["aws"])
+        return jsonify({'message': 'multipart upload URL signed', 'url': url}), 200 
+    except Exception:
+        return jsonify(message="An error occurred when attempting to sign multipart upload URL"), 500
+
+@app.route('/api/file/completemultipart', methods = ['POST'])
+@accesskey_login
+@login_required
+@upload_credentials
+def completemultipart():
+    try:
+        data = request.get_json()
+        s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
+        return jsonify({'message': 'multipart upload completed'}), 200 
+    except Exception:
+        return jsonify(message="An error occurred when attempting to complete multipart upload"), 500
+
 # ------------------- end file -------------------
 
 # Role API endpoints
@@ -197,23 +289,45 @@ def delete_file(file_id):
 # - user [PATCH] -> update role
 # - user [DELETE] -> delete role
 @app.route('/api/role', methods = ["GET"])
+@accesskey_login
 @login_required
 @admin_required
 def get_role():
-    roles = dbutils.list_roles()
-    return jsonify(roles)
+    try:
+        roles = dbutils.list_roles()
+        return jsonify(roles=roles)
+    except Exception:
+        return jsonify(message="An error occurred when attempting to list roles"), 500
 
 @app.route('/api/role', methods = ["POST"])
 def post_role():
-    return jsonify({"mode": "POST"})
+    try:
+        data = request.get_json()
+        pol = []
+        if "policies" in data.keys():
+            pol = data["policies"]
+        role = dbutils.create_role(data["rolename"], policies=pol)
+        return jsonify({"message": "role created", "role": role}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to create role"), 500
+
 
 @app.route('/api/role', methods = ["PATCH"])
 def patch_role():
-    return jsonify({"mode": "PATCH"})
+    try: 
+       return jsonify({"message": "role updated"}), 200
+    except Exception:
+        return jsonify(message="An error occurred when attempting to update role"), 500
 
-@app.route('/api/role', methods = ["DELETE"])
+
+@app.route('/api/role/{role_id}', methods = ["DELETE"])
 def delete_role():
-    return jsonify({"mode": "DELETE"})
+    try: 
+       return jsonify({"message": "role deleted"}), 200
+    except Exception:
+        return jsonify(message="An error occurred when attempting to delete role"), 500
+
 # ------------------- end role -------------------
 
 # Collection API endpoints
@@ -253,7 +367,7 @@ def delete_collection():
 # - user [GET] -> list all roles
 # - user [POST]-> create a new role
 # - user [DELETE] -> delete role
-@app.route('/api/accesskey', methods = ["GET"])
+@app.route('/api/user/accesskey', methods = ["GET"])
 @accesskey_login
 @login_required
 def get_access_keys():
@@ -261,7 +375,7 @@ def get_access_keys():
     access_keys = dbutils.list_user_access_keys(user["id"])
     return jsonify(access_keys)
 
-@app.route('/api/accesskey/<int:expiration>', methods = ["POST"])
+@app.route('/api/user/accesskey/<int:expiration>', methods = ["POST"])
 @accesskey_login
 @login_required
 def post_access_key(expiration):
@@ -269,7 +383,7 @@ def post_access_key(expiration):
     dbutils.create_access_key(user["id"], expiration)
     return jsonify({"mode": "POST"})
 
-@app.route('/api/accesskey/<int:akey>', methods = ["DELETE"])
+@app.route('/api/user/accesskey/<int:akey>', methods = ["DELETE"])
 @login_required
 def delete_access_key(akey):
     try:
@@ -283,22 +397,21 @@ def delete_access_key(akey):
         traceback.print_exc()
         return jsonify(message="An error occurred when deleting key"), 500
 
-@app.route('/api/keylogin', methods=["GET"])
+@app.route('/api/user/keylogin', methods=["GET"])
 def keylogin():
     user = dbutils.get_key_user(user_key)
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
     session.permanent = True
 
-# ------------------- end role -------------------
 
 # ------------------ Login/Logout ----------------
-@app.route('/login')
+@app.route('/api/user/login')
 def login():
     google = oauth.create_client('google')  # create the google oauth client
     redirect_uri = url_for('authorize', _external=True)
     return google.authorize_redirect(redirect_uri)
 
-@app.route('/logout')
+@app.route('/api/user/logout')
 @accesskey_login
 @login_required
 def logout():
@@ -306,7 +419,7 @@ def logout():
         session.pop(key)
     return redirect('/')
 
-@app.route('/authorize')
+@app.route('/api/user/authorize')
 def authorize():
     google = oauth.create_client("google")
     token = google.authorize_access_token()
@@ -321,7 +434,7 @@ def authorize():
     #return redirect('/')
     return redirect(conf["redirect"]["url"]+'/myfiles')
 
-@app.route('/api/i')
+@app.route('/api/user/i')
 @accesskey_login
 @login_required
 def mycred():
@@ -333,18 +446,6 @@ def mycred():
 # ------------------- end login -------------------
 
 
-# ------------------ File Download ------------------
-
-@app.route('/api/file/download/<int:fileid>', methods = ['GET'])
-@accesskey_login
-@login_required
-def download(fileid):
-    #data = request.get_json()
-    db_file = dbutils.get_file(fileid)
-    print(db_file)
-    response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
-    res = {'status': 'ok', 'response': response}
-    return jsonify(res)
 
 # ============== policies ============
 @app.route('/api/policies', methods = ['GET'])
@@ -354,51 +455,6 @@ def download(fileid):
 def list_policies():
     policies = dbutils.list_policies()
     return jsonify(policies)
-
-# ============== file upload functions ===============
-@app.route('/api/upload', methods = ['POST'])
-@accesskey_login
-@login_required
-@upload_credentials
-def upload():
-    data = request.get_json()
-    db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
-    # check whether user has rights to upload data
-    # general upload rights, resource write credentials (e.g. user is allowed to write)
-    response = s3utils.sign_upload_file(db_file["uuid"]+"/"+data["filename"], conf["aws"])
-    res = {'status': 'ok', 'response': response}
-    return jsonify(res)
-
-@app.route('/api/startmultipart', methods = ['POST'])
-@accesskey_login
-@login_required
-@upload_credentials
-def startmultipart():
-    data = request.get_json()
-    db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
-    response = s3utils.start_multipart(db_file["uuid"]+"/"+data["filename"], conf["aws"])
-    res = {'status': 'ok', 'upload_id': response, 'uuid': db_file["uuid"]}
-    return jsonify(res)
-
-@app.route('/api/signmultipart', methods = ['POST'])
-@accesskey_login
-@login_required
-@upload_credentials
-def signmultipart():
-    data = request.get_json()
-    url = s3utils.sign_multipart(data["filename"], data["upload_id"], data["part_number"], conf["aws"])
-    res = {'status': 'ok', 'url': url}
-    return jsonify(res)
-
-@app.route('/api/completemultipart', methods = ['POST'])
-@accesskey_login
-@login_required
-@upload_credentials
-def completemultipart():
-    data = request.get_json()
-    s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
-    res = {'status': 'ok'}
-    return jsonify(res)
 
 # ----------- Proxy to next.js frontend -----------
 

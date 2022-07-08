@@ -4,9 +4,15 @@ import s3utils
 
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
-    print(user_roles)
     for r in user_roles:
         if r["name"] == "admin":
+            return True
+    return False
+
+def is_uploader(user_id):
+    user_roles = get_user_roles(user_id)
+    for r in user_roles:
+        if r["name"] == "uploader":
             return True
     return False
 
@@ -43,13 +49,54 @@ def create_user(user_info):
     db.session.commit()
     return {"id": user.id, "name": user.name, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid, "date": user.creation_date}
 
+# ----------- roles ----------------
+
+def create_role(role_name, policies=[]):
+    if db.session.query(Role).filter(Role.name == role_name).first() is None:
+        role = Role(name=role_name)
+        for p in policies:
+            policy = db.session.query(Policy).filter(Policy.id == p).first()
+            role.policies.append(policy)
+        db.session.add_all([role])
+        db.session.commit()
+        return(print_role(role))
+    else:
+        raise Exception("Role name already exists. Choose a different name")
+
 def list_roles():
     db_roles = Role.query.all()
-    print(db_roles)
     roles = []
     for role in db_roles:
-        roles.append({"id": role.id, "name": role.name})
+        r = print_role(role)
+        roles.append(r)
     return roles
+
+def print_role(role):
+    policies = []
+    for policy in role.policies:
+        pp = print_policy(policy)
+        policies.append(pp)
+    return({"id": role.id, "name": role.name, "policies": policies})
+
+def print_policy(policy):
+    pp = dict(policy.__dict__)
+    pp.pop('_sa_instance_state', None)
+
+    files = []
+    collections = []
+    for collection in policy.collections:
+        c = dict(collection.__dict__)
+        c.pop('_sa_instance_state', None)
+        collections.append(c["id"])
+
+    files = []
+    for file in policy.files:
+        f = dict(collection.__dict__)
+        f.pop('_sa_instance_state', None)
+        files.append(f["id"])
+    pp["collections"] = collections
+    pp["files"] = files
+    return(pp)
 
 # ===== files ========
 
@@ -58,7 +105,7 @@ def create_file(db, file_name, file_size, user_id):
     file = File(name=file_name, user=user, size=file_size)
     db.session.add_all([file])
     db.session.commit()
-    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "size": file.size}
+    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "owner_name": user.name, "size": file.size, "accessibility": file.accessibility, "visibility": file.visibility, "collection_id": file.collection_id}
 
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
@@ -218,6 +265,7 @@ def update_file(db, file, updater_id):
     db_file.owner_id = file["owner_id"]
     db_file.collection_id = file["collection_id"]
     db_file.visibility = file["visibility"]
+    db_file.status = file["status"]
     db_file.accessibility = file["accessibility"]
     db.session.commit()
 
@@ -272,3 +320,23 @@ def get_key_user(user_key):
     akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
     user = db.session.query(User).filter(User.id == akey.owner_id).first()
     return user
+
+def todict(obj, classkey=None):
+    if isinstance(obj, dict):
+        data = {}
+        for (k, v) in obj.items():
+            data[k] = todict(v, classkey)
+        return data
+    elif hasattr(obj, "_ast"):
+        return todict(obj._ast())
+    elif hasattr(obj, "__iter__") and not isinstance(obj, str):
+        return [todict(v, classkey) for v in obj]
+    elif hasattr(obj, "__dict__"):
+        data = dict([(key, todict(value, classkey)) 
+            for key, value in obj.__dict__.items() 
+            if not callable(value) and not key.startswith('_')])
+        if classkey is not None and hasattr(obj, "__class__"):
+            data[classkey] = obj.__class__.__name__
+        return data
+    else:
+        return obj

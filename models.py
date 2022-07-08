@@ -107,7 +107,6 @@ class Collection(db.Model):
             if hasattr(self, key):
                 setattr(self, key, value)
 
-
 class Accesskey(db.Model):
     __tablename__ = 'accesskey'
     

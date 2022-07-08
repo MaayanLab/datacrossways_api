@@ -11,27 +11,25 @@ def login_required(f):
         # the other data for that user/check if they exist
         if user:
             return f(*args, **kwargs)
-        return jsonify({'error': 'You are currently not logged in!'})
+        return jsonify({'message': 'You are currently not logged in!'}), 401
     return decorated_function
 
 def upload_credentials(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = dict(session).get('user', None)
-        # You would add a check here and usethe user id or something to fetch
-        # the other data for that user/check if they exist
-        if user:
+        if dbutils.is_admin(user["id"]) or dbutils.is_uploader(user["id"]):
             return f(*args, **kwargs)
-        return 'You are currently not allowed to upload data. Ask an administrator for help.'
+        return jsonify({'message': 'You need to be admin or have permission to upload files.'}), 403
     return decorated_function
 
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = dict(session).get('user', None)
-        if dbutils.is_admin(user["id"]):
+        if dbutils.is_admin(user["id"]) :
             return f(*args, **kwargs)
-        return jsonify({'error': 'You need to be Admin for this operation.'})
+        return jsonify({'message': 'You need to be admin for this operation.'}), 403
     return decorated_function
 
 def accesskey_login(f):
@@ -42,7 +40,5 @@ def accesskey_login(f):
             user = dbutils.get_key_user(user_key)
             session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
             session.permanent = True
-            print("user loggd in")
-            print(user)
         return f(*args, **kwargs)
     return decorated_function
