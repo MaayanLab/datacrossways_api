@@ -40,7 +40,7 @@ def sign_get_file(file_name, cred):
             'Bucket': cred["bucket_name"],
             'Key': file_name,
         },
-        ExpiresIn=60
+        ExpiresIn=60*60
     )
     return url
 

@@ -19,6 +19,10 @@ from middleware import login_required, upload_credentials, admin_required, acces
 
 from datetime import timedelta
 
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 def read_config():
     f = open('secrets/config.json')
     return json.load(f)
@@ -54,11 +58,6 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-@app.route('/api/user/testkey', methods = ["GET"])
-@accesskey_login
-def test_me():
-    return jsonify(message="ok")
-
 # User API endpoints
 # - user [GET] -> list all users
 # - user [POST]-> create a new user
@@ -71,7 +70,7 @@ def test_me():
 def get_user():
     try:
         users = dbutils.list_users()
-        return jsonify(users), 200
+        return jsonify(users=users), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when listing users"), 500
@@ -91,39 +90,39 @@ def get_user_files():
 @login_required
 @admin_required
 def post_user():
-    user_info = {
-        "name": "Megan Wojciechowicz",
-        "first_name": "Megan",
-        "last_name": "Wojciechowicz",
-        "email": "megan.Wojciechowicz@mssm.edu"
-    }
-    user = dbutils.create_user(user_info)
-    return jsonify(user)
+    try:
+        data = request.get_json()
+        user = dbutils.create_user(data)
+        return jsonify({"message": "user created successfully", "user": user}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when creating user"), 500
 
 @app.route('/api/user', methods = ["PATCH"])
 @accesskey_login
 @login_required
 @admin_required
 def patch_user():
-    user = request.get_json()
     try:
-        dbutils.update_user(db, user, session["user"]["id"])
-        return jsonify(user), 203
+        user = request.get_json()
+        user = dbutils.update_user(user)
+        return jsonify({"message": "user updated", "user": user}), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when updating user"), 500
 
-@admin_required
-@login_required
-@app.route('/api/user', methods = ["DELETE"])
 @accesskey_login
-def delete_user():
+@login_required
+@admin_required
+@app.route('/api/user/<int:user_id>', methods = ["DELETE"])
+def delete_user(user_id):
     user = request.get_json()
     try:
-        dbutils.delete_user(db, user, session["user"]["id"])
-        return jsonify(user), 203
+        user = dbutils.delete_user(user_id)
+        return jsonify({"message": "user deleted successfully", "user": user}), 203
     except Exception:
-        return jsonify(message="An error occurred when updating user"), 500
+        traceback.print_exc()
+        return jsonify(message="An error occurred when deleting user"), 500
 # ------------------- end user -------------------
 
 # File API endpoints
@@ -137,8 +136,8 @@ def delete_user():
 @admin_required
 def get_file():
     try:
-        files = dbutils.list_all_files()
-        return jsonify(files)
+        files = dbutils.list_files()
+        return jsonify({"message": "files listed successfully", "files": files})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
@@ -270,7 +269,7 @@ def completemultipart():
 def get_role():
     try:
         roles = dbutils.list_roles()
-        return jsonify(roles=roles)
+        return jsonify(roles=roles), 200
     except Exception:
         return jsonify(message="An error occurred when attempting to list roles"), 500
 
@@ -286,7 +285,6 @@ def post_role():
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to create role"), 500
-
 
 @app.route('/api/role', methods = ["PATCH"])
 def patch_role():
@@ -311,6 +309,43 @@ def delete_role(role_id):
 
 # ------------------- end role -------------------
 
+# Role API endpoints
+# - user [GET] -> list all roles
+# - user [POST]-> create a new role
+# - user [PATCH] -> update role
+# - user [DELETE] -> delete role
+@app.route('/api/policy', methods = ["GET"])
+@accesskey_login
+@login_required
+@admin_required
+def get_policy():
+    try:
+        policies = dbutils.list_policies()
+        return jsonify(policies=policies), 200
+    except Exception:
+        return jsonify(message="An error occurred when attempting to list policies"), 500
+
+@app.route('/api/policy', methods = ["POST"])
+def post_policy():
+    try:
+        data = request.get_json()
+        policy = dbutils.create_policy(data)
+        return jsonify({"message": "policy created", "policy": policy}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to create policy"), 500
+
+@app.route('/api/policy/<int:policy_id>', methods = ["DELETE"])
+def delete_policy(policy_id):
+    try:
+        policy = dbutils.delete_policy(policy_id)
+        return jsonify({"message": "policy deleted", "policy": policy}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to delete policy"), 500
+        
+
+
 # Collection API endpoints
 # - user [GET] -> list all roles
 # - user [POST]-> create a new role
@@ -320,31 +355,54 @@ def delete_role(role_id):
 @login_required
 @admin_required
 def get_collections():
-    collections = dbutils.list_collections()
-    return jsonify(collections)
+    try:
+        collections = dbutils.list_collections()
+        return jsonify({"message": "collections listed successfully", "collections": collections})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to list collections"), 500
 
 @app.route('/api/collection/<int:collection_id>', methods = ["GET"])
 @login_required
 def get_collection(collection_id):
     try:
         user = dict(session).get('user', None)
-        collection = dbutils.get_collection(collection_id, user["id"])
-        return jsonify(collection)
+        collections = dbutils.get_collection(collection_id, user["id"])
+        return jsonify({"message": "collections listed successfully", "collections": files})
     except Exception:
         traceback.print_exc()
 
 
 @app.route('/api/collection', methods = ["POST"])
 def post_collection():
-    return jsonify({"mode": "POST"})
+    try:
+        data = request.get_json()
+        collection = dbutils.create_collection(data)
+        return jsonify({"message": "collections created successfully", "collection": collection})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to create collection"), 500
 
 @app.route('/api/collection', methods = ["PATCH"])
 def patch_collection():
-    return jsonify({"mode": "PATCH"})
+    try:
+        data = request.get_json()
+        collection = dbutils.update_collection(data)
+        return jsonify({"message": "collection updated successfully", "collection": collection})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to update collection"), 500
 
-@app.route('/api/collection', methods = ["DELETE"])
-def delete_collection():
-    return jsonify({"mode": "DELETE"})
+
+@app.route('/api/collection/<int:collection_id>', methods = ["DELETE"])
+def delete_collection(collection_id):
+    try:
+        collection = dbutils.delete_collection(collection_id)
+        return jsonify({"message": "collection deleted successfully", "collection": collection})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to delete collection"), 500
+
 # ------------------- end collection -------------------
 
 # Accesskey API endpoints

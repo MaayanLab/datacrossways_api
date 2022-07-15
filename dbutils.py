@@ -44,10 +44,68 @@ def get_user(db, response):
     return user
 
 def create_user(user_info):
-    user = User(name=user_info["name"], first_name=user_info["first_name"], last_name=user_info["last_name"], email=user_info["email"])
-    db.session.add_all([user])
+    if db.session.query(User).filter(User.email == user_info["email"]).first() is None:
+        collections = user_info["collections"]
+        files = user_info["files"]
+        roles = user_info["roles"]
+        user_info.pop("collections", None)
+        user_info.pop("files", None)
+        user_info.pop("roles", None)
+        user = User(**user_info)
+
+        user.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
+        user.files  = db.session.query(File).filter(File.id.in_(files)).all()
+        user.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
+
+        db.session.add(user)
+        db.session.commit()
+        db.session.refresh(user)
+        return(print_user(user))
+    else:
+        raise Exception("User already exists")
+
+def delete_user(user_id):
+    dbuser = db.session.query(User).filter(User.id == user_id).first()
+    owned = db.session.query(File).filter(File.owner_id == user_id).all()
+    [db.session.delete(x) for x in owned]
+    owned = db.session.query(Collection).filter(Collection.owner_id == user_id).all()
+    [db.session.delete(x) for x in owned]
+    r = print_user(dbuser)
+    User.query.filter_by(id=user_id).delete()
     db.session.commit()
-    return {"id": user.id, "name": user.name, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid, "date": user.creation_date}
+    return(r)
+
+def update_user(user):
+    dbuser = db.session.query(User).filter(User.id == user["id"]).first()
+    user.pop("creation_date", None)
+    user.pop("uuid", None)
+    user.pop("id", None)
+
+    collections = user["collections"]
+    files = user["files"]
+    roles = user["roles"]
+    user.pop("collections", None)
+    user.pop("files", None)
+    user.pop("roles", None)
+
+    dbuser.collections = list(set(dbuser.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
+    dbuser.files  = list(set(dbuser.files + db.session.query(File).filter(File.id.in_(files)).all()))
+    dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
+
+    if "name" in user:
+        dbuser.name = user["name"]
+    if "first_name" in user:
+        dbuser.first_name = user["first_name"]
+    if "last_name" in user:
+        dbuser.last_name = user["last_name"]
+    if "email" in user:
+        dbuser.email = user["email"]
+    if "affiliation" in user:
+        dbuser.affiliation = user["affiliation"]
+
+    db.session.commit()
+
+    return(print_user(dbuser))
 
 # ----------- roles ----------------
 
@@ -96,6 +154,7 @@ def create_role(role_name, policies=[]):
             role.policies.append(policy)
         db.session.add_all([role])
         db.session.commit()
+        db.session.refresh(role)
         return(print_role(role))
     else:
         raise Exception("Role name already exists. Choose a different name")
@@ -129,7 +188,7 @@ def print_policy(policy):
 
     files = []
     for file in policy.files:
-        f = dict(collection.__dict__)
+        f = dict(file.__dict__)
         f.pop('_sa_instance_state', None)
         files.append(f["id"])
     pp["collections"] = collections
@@ -143,6 +202,7 @@ def create_file(db, file_name, file_size, user_id):
     file = File(name=file_name, user=user, size=file_size)
     db.session.add_all([file])
     db.session.commit()
+    db.session.refresh(file)
     return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "owner_name": user.name, "size": file.size, "accessibility": file.accessibility, "visibility": file.visibility, "collection_id": file.collection_id}
 
 def get_file(file_id):
@@ -158,7 +218,7 @@ def delete_file(file_id, user):
     else:
         return 0
 
-def list_all_files():
+def list_files():
     #db_files = File.query.order_by(File.id).all()
     db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).all()
     files = []
@@ -180,9 +240,7 @@ def list_users():
     db_users = User.query.order_by(User.id).all()
     users = []
     for user in db_users:
-        roles = get_user_roles(user.id)
-        files = list_user_files(user.id)
-        users.append({"id": user.id, "name": user.name, "uuid": user.uuid, "first_name": user.first_name, "last_name": user.last_name, "affiliation": user.affiliation,  "date": user.creation_date, "roles": roles, "files": files, "email": user.email})
+        users.append(print_user(user))
     return users
 
 def get_user_roles(userid):
@@ -192,14 +250,34 @@ def get_user_roles(userid):
     print(roles)
     return roles
 
-""" def get_user_scope(userid):
-    read_cred = []
-    write_cred = []
-    list_cred = []
+def print_user(user):
     roles = []
-    for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
-        roles.append(r)
- """
+    for r in user.roles:
+        roles.append(r.id)
+    files = []
+    for f in user.files:
+        files.append(f.id)
+    collections = []
+    for c in user.collections:
+        collections.append(c.id)
+    user = dict(user.__dict__)
+    user.pop('_sa_instance_state', None)
+    user["files"] = files
+    user["roles"] = roles
+    user["collections"] = collections
+    return(user)
+
+def print_file():
+    return({})
+
+def print_collection(collection):
+    collections = [c.id for c in collection.collections]
+    files = [f.id for f in collection.files]
+    collection = dict(collection.__dict__)
+    collection.pop('_sa_instance_state', None)
+    collection["collections"] = collections
+    collection["files"] = files
+    return(collection)
 
 def get_scope(userid):
     read_cred = []
@@ -237,29 +315,71 @@ def append_role(user_id, role_name):
     user.roles.append(role)
     db.session.commit()
 
-def update_user(db, user, updater_id):
-    db_user = db.session.query(User).filter(User.id == user["id"]).first()
-    db_user.firstname = user["first_name"]
-    db_user.lastname = user["last_name"]
-    db_user.email = user["email"]
-    db_user.affiliation = user["affiliation"]
-    
-    db_user.roles = []
-    for role in user["roles"]:
-        role = Role.query.filter(Role.id==role["id"]).first()
-        db_user.roles.append(role)
-
-    db.session.commit()
-
-
 def list_collections():
-    db_collections = db.session.query(Collection, User.name).filter(Collection.owner_id == User.id).order_by(Collection.id).all()
+    db_collections = Collection.query.all()
     
     #db_collections = Collection.query.order_by(Collection.id).all()
     collections = []
     for collection in db_collections:
-        collections.append({"id": collection[0].id, "name": collection[0].name, "uuid": collection[0].uuid, "parent_collection_id": collection[0].parent_collection_id, "date": collection[0].creation_date, "owner_id": collection[0].owner_id, "owner_name": collection[1]})
+        collections.append(print_collection(collection))
     return collections
+
+def create_collection(collection):
+    files = collection["files"]
+    cols = collection["collections"]
+    collection.pop("collections", None)
+    collection.pop("files", None)
+    dbcollection = Collection(**collection)
+    dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(cols)).all()
+    dbcollection.files  = db.session.query(File).filter(File.id.in_(files)).all()
+    db.session.commit()
+    db.session.refresh(dbcollection)
+    return(print_collection(dbcollection))
+
+
+def update_collection(collection):
+    dbcollection = db.session.query(Collection).filter(Collection.id == collection["id"]).first()
+    collection.pop("creation_date", None)
+    collection.pop("uuid", None)
+    collection.pop("id", None)
+
+    collections = collection["collections"]
+    files = collection["files"]
+    collection.pop("collections", None)
+    collection.pop("files", None)
+
+    dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
+    dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
+
+    if "name" in collection:
+        dbcollection.name = collection["name"]
+    if "description" in collection:
+        dbcollection.description = collection["description"]
+    if "image_url" in collection:
+        dbcollection.image_url = collection["image_url"]
+    if "visibility" in collection:
+        dbcollection.visibility = collection["visibility"]
+    if "affiliation" in collection:
+        dbcollection.affiliation = collection["affiliation"]
+    if "owner_id" in collection:
+        dbcollection.owner_id = collection["owner_id"]
+    if "parent_collection_id" in collection:
+        dbcollection.parent_collection_id = collection["parent_collection_id"]
+    if "visibility" in collection:
+        dbcollection.visibility = collection["visibility"]
+    if "accessibility" in collection:
+        dbcollection.accessibility = collection["accessibility"]
+    
+    db.session.commit()
+    db.session.refresh(dbcollection)
+    return(print_collection(dbcollection))
+
+def delete_collection(collection_id):
+    dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
+    c = print_collection(dbcollection)
+    Collection.query.filter(id == collection_id).delete()
+    db.session.commit()
+    return(c)
 
 def get_collection(collection_id, user_id):
     user_roles = get_user_roles(user_id)
@@ -310,26 +430,34 @@ def update_file(db, file, updater_id):
 def list_policies():
     db_policies = db.session.query(Policy).order_by(Policy.id).all()
     policies = []
-
     for policy in db_policies:
-        
-        file_res = db.session.query(File, PolicyFiles).filter(PolicyFiles.policy_id == policy.id).filter(File.id == PolicyFiles.file_id).all()
-        files = []
-        for file in file_res:
-            print(file)
-            files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].name, "uuid": file[0].uuid})
-        
-        collection_res = db.session.query(Collection, PolicyCollections).filter(PolicyCollections.policy_id == policy.id).filter(Collection.id == PolicyCollections.collection_id).all()
-        collections = []
-        for collection in collection_res:
-            print("----")
-            print(collection)
-            print("----")
-            collections.append({"id": collection[0].id, "name": collection[0].name, "uuid": collection[0].uuid})
-        policies.append({"id": policy.id, "effect": policy.effect, "action": policy.action, "creation_date": policy.creation_date, "files": files, "collections": collections})
-    
+        policies.append(print_policy(policy))
     return policies
 
+def create_policy(data):
+    collections = []
+    for collection in data["collections"]:
+        db_collection = db.session.query(Collection).filter(Collection.id==collection).first()
+        if db_collection is not None:
+            collections.append(db_collection)
+    files = []
+    for file in data["files"]:
+        db_file = db.session.query(File).filter(File.id==file).first()
+        if db_file is not None:
+            files.append(db_file)
+
+    policy = Policy(action=data["action"], effect=data["effect"], collections=collections, files=files)
+    db.session.add_all([policy])
+    db.session.commit()
+    db.session.refresh(policy)
+    return(print_policy(policy))
+
+def delete_policy(policy_id):
+    dbpolicy = db.session.query(Policy).filter(Policy.id == policy_id).first()
+    p = print_policy(dbpolicy)
+    Policy.query.filter_by(id=policy_id).delete()
+    db.session.commit()
+    return(p)
 
 def list_user_access_keys(user_id):
     db_access_keys = db.session.query(Accesskey).filter(Accesskey.owner_id == user_id).order_by(Accesskey.id).all()

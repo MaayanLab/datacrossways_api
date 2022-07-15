@@ -29,16 +29,16 @@ class User(db.Model):
     name = db.Column(db.String())
     first_name = db.Column(db.String())
     last_name = db.Column(db.String())
-    email = db.Column(db.String())
+    email = db.Column(db.String(), unique=True)
     affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid)
 
     # relationships
-    file_id = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
-    collection_id = db.relationship('Collection', cascade='all, delete', backref='user', lazy=True)
+    files = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
+    collections = db.relationship('Collection', cascade='all, delete', backref='user', lazy=True)
     roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
-    key_id = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
+    keys = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
 
     def __init__(self, name, first_name, last_name, email, affiliation=""):
         self.name = name
@@ -68,6 +68,7 @@ class File(db.Model):
     status = db.Column(db.String(), default="uploading")
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="locked")
+    description = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     size = db.Column(db.Integer(), default=0)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
@@ -96,8 +97,8 @@ class Collection(db.Model):
     accessibility = db.Column(db.String(), default="open")
 
     # relationships
-    children = db.relationship('Collection', cascade='all, delete', backref=db.backref('parent', remote_side=[id]), lazy=True)
-    child_file_id = db.relationship('File', cascade='all, delete', backref='collection', lazy=True)
+    collections = db.relationship('Collection', cascade='all, delete', backref=db.backref('parent', remote_side=[id]), lazy=True)
+    files = db.relationship('File', cascade='all, delete', backref='collection', lazy=True)
     
     def __repr__(self):
         return f"{self.id}-{self.name}-{self.uuid}"
