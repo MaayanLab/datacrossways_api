@@ -2,6 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from pymysql import NULL
 import shortuuid
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy_json import mutable_json_type
 
 db = SQLAlchemy()
 
@@ -19,8 +21,6 @@ def generate_key():
 
 def default_name(context):
     return context.get_current_parameters()['name']
-
-
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -46,10 +46,10 @@ class User(db.Model):
         self.last_name = last_name
         self.email = email
         self.affiliation = affiliation
- 
+    
     def __repr__(self):
         return f"{self.id}-{self.name}-{self.email}-{self.uuid}"
-
+    
     def get_email(self):
         return f"{self.email}"
 
@@ -73,6 +73,8 @@ class File(db.Model):
     size = db.Column(db.Integer(), default=0)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
     collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
+
+    meta = db.Column(mutable_json_type(dbtype=JSONB, nested=True))
     
     def __repr__(self):
         return f"{self.id}: {self.name}: {self.uuid}"

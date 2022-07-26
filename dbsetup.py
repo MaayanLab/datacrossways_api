@@ -1,4 +1,6 @@
 from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+import copy
+import random
 
 db.drop_all()
 db.create_all()
@@ -34,13 +36,53 @@ file_7 = File(name="file_7.txt", user=user_2, collection=root_collection)
 
 lyme_collection = Collection(name="lyme_data", user=user_3, parent=root_collection)
 
-file_8 = File(name="file_8.txt", user=user_3, collection=lyme_collection)
-file_9 = File(name="file_9.txt", user=user_3, collection=lyme_collection)
-file_10 = File(name="file_10.txt", user=user_3, collection=lyme_collection)
-file_11 = File(name="file_11.txt", user=user_3, collection=lyme_collection)
+metadata = {
+    "wow": "ok",
+    "array": [1,3,4,5],
+    "more": {
+        "keeps_going": "nice",
+        "present": True
+    }
+}
+
+file_8 = File(name="file_8.txt", user=user_3, collection=lyme_collection, meta=metadata)
+file_9 = File(name="file_9.txt", user=user_3, collection=lyme_collection, meta=metadata)
+file_10 = File(name="file_10.txt", user=user_3, collection=lyme_collection, meta=copy.deepcopy(metadata))
+file_11 = File(name="file_11.txt", user=user_3, collection=lyme_collection, meta=copy.deepcopy(metadata))
 
 db.session.add_all([file_1, file_2, file_3, file_4, file_5, file_6, file_7, file_8, file_9, file_10, file_11])
 db.session.commit()
+
+uif = []
+for r in range(10000):
+    random.seed(r)
+    metadata = {
+        "id": r,
+        "project": "p"+str(r%30),
+        "array": [1,3,4,5],
+        "creator": {
+            "name": "c"+str(r%20),
+            "present": True,
+            "affiliation": "mssm"
+        },
+        "subject": {
+            "id": r%500,
+            "age": random.uniform(0, 100),
+            "gender": random.choice(["male", "female"]),
+            "ethnicity": random.choices(["Hispanic", "White", "Black or African American", "American Indian and Alaska Native", "Asian", "Native Hawaiian and Other Pacific Islander", "Other", "Multiracial"], weights=(30, 41, 28, 1, 14, 1, 14, 5), k=1)[0]
+        },
+        "experiment": {
+            "group": random.choice(["control", "treatment"]),
+        }
+    }
+    if r%2 == 0:
+        metadata["extra"] = r
+    f = File(name="file_"+str(r)+".txt", user=user_1, collection=lyme_collection, meta=copy.deepcopy(metadata))
+    uif.append(f)
+
+db.session.add_all(uif)
+db.session.commit()
+
 
 policy_1 = Policy(effect="allow", action="list")
 policy_2 = Policy(effect="allow", action="read")
@@ -58,7 +100,6 @@ base_reader.policies.append(policy_2)
 
 policy_3 = Policy(effect="allow", action="list")
 policy_3.collections.append(root_collection)
-
 
 policy = Policy(effect="allow", action="list")
 policy.collections.append(lyme_collection)

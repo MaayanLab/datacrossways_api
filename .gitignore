@@ -39,3 +39,6 @@ yarn-error.log*
 
 package-lock.json
 yarn.lock
+
+test/*
+requirements_old.txt

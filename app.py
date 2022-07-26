@@ -142,6 +142,33 @@ def get_file():
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
 
+@app.route('/api/file/search', methods = ["POST"])
+@accesskey_login
+@login_required
+@admin_required
+def search_file():
+    try:
+        data = request.get_json()
+        print(data)
+        files = dbutils.search_files(data, session["user"]["id"])
+        paging = []
+        return jsonify({"message": "files searched successfully", "files": files, "paging": paging})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when searching files"), 500
+
+@app.route('/api/file/filter', methods = ["GET"])
+@accesskey_login
+@login_required
+@admin_required
+def get_filters():
+    try:
+        filters = dbutils.get_filters(session["user"]["id"])
+        return jsonify({"message": "file filter retrieved successfully", "filters": filters})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when retrieving file filters"), 500
+
 @app.route('/api/file', methods = ["POST"])
 @accesskey_login
 @login_required
@@ -199,6 +226,21 @@ def download(fileid):
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to sign URL"), 500
 
+@app.route('/api/file/annotate/<int:fileid>', methods = ['post'])
+@accesskey_login
+@login_required
+def annotate_file(fileid):
+    try:
+        user = dict(session).get('user', None)
+        data = request.get_json()
+        if dbutils.is_owner_file(user["id"], fileid) or dbutils.is_admin(user["id"]):
+            db_file = dbutils.annotate_file(fileid, data)
+            return jsonify({"message": "file updated", "file": db_file}), 200
+        else:
+            return jsonify(message="No permission to annotate file"), 403
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when annotating file"), 500
 
 
 # ============== file upload functions ===============
@@ -413,17 +455,26 @@ def delete_collection(collection_id):
 @accesskey_login
 @login_required
 def get_access_keys():
-    user = dict(session).get('user', None)
-    access_keys = dbutils.list_user_access_keys(user["id"])
-    return jsonify(access_keys)
+    try:
+        user = dict(session).get('user', None)
+        access_keys = dbutils.list_user_access_keys(user["id"])
+        return jsonify({"message": "keys successfully listed", "keys": access_keys}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing keys"), 500
+
 
 @app.route('/api/user/accesskey/<int:expiration>', methods = ["POST"])
 @accesskey_login
 @login_required
 def post_access_key(expiration):
-    user = dict(session).get('user', None)
-    dbutils.create_access_key(user["id"], expiration)
-    return jsonify({"mode": "POST"})
+    try:
+        user = dict(session).get('user', None)
+        key = dbutils.create_access_key(user["id"], expiration)
+        return jsonify({"key": key}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when creating key"), 500
 
 @app.route('/api/user/accesskey/<int:akey>', methods = ["DELETE"])
 @login_required

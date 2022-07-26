@@ -35,10 +35,13 @@ def admin_required(f):
 def accesskey_login(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        user_key = request.headers.get('x-api-key', None)
-        if user_key:
-            user = dbutils.get_key_user(user_key)
-            session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-            session.permanent = True
+        if not "user" in session.keys():
+            user_key = request.headers.get('x-api-key', None)
+            if user_key:
+                if not dbutils.key_valid(user_key):
+                    return jsonify({'message': 'API key invalid or expired.'}), 403
+                user = dbutils.get_key_user(user_key)
+                session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+                session.permanent = True
         return f(*args, **kwargs)
     return decorated_function

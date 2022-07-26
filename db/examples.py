@@ -250,3 +250,184 @@ def add_collection_scope(collection, action, list_cred, read_cred, write_cred):
             write_cred.append(c.uuid)
         elif action == "read":
             read_cred.append(c.uuid)
+
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+
+db.session.query(Role).filter(Role.name == role_name).first()
+
+import traceback
+import json
+import jsonschema
+from jsonschema import validate
+
+def validate_json(json_data, schema_data):
+    try:
+        validate(instance=json_data, schema=schema_data)
+    except jsonschema.exceptions.ValidationError as err:
+        traceback.print_exc()
+        return False
+    return True
+
+schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "number": {"type": "number"}
+    },
+    "required": ["name", "number"]
+}
+
+testdata = {
+    "name": "1",
+    "number": 1
+}
+
+validate_json(testdata, schema)
+
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+import time
+import traceback
+from sqlalchemy.types import Integer, Float
+
+query = {
+    "creator": {
+        "name": "c2%"
+    },
+    "project": "p1%",
+    "extra": None,
+    "subject": {
+        "ethnicity": "Hispanic",
+        "age": {
+            "between": [20,35]
+        }
+    }
+}
+
+
+def filterjson(filter, file, j):
+    jkeys = j.keys()
+    for k in jkeys:
+        if type(j[k]) == int:
+            filter = filter.filter(file[k].cast(Integer) == j[k])
+        elif type(j[k]) == float:
+            filter = filter.filter(file[k].cast(Float) == j[k])
+        elif j[k] == None:
+            filter = filter.filter(file.has_key(k))
+        elif "%" in j[k]:
+            filter = filter.filter(file[k].astext.like(j[k]))
+        elif type(j[k]) == str:
+            filter = filter.filter(file[k].astext == j[k])
+        elif "between" in j[k].keys():
+            filter = filter.filter(file[k].cast(Float) >= j[k]["between"][0]).filter(file[k].cast(Float) <= j[k]["between"][1])
+        else:
+            try:
+                filter = filterjson(filter, file[k], j[k])
+            except Exception:
+                traceback.print_exc()
+    return filter
+
+
+tt = time.time()
+res = filterjson(db.session.query(File), File.meta, query).all()
+print(len(res))
+print(time.time()-tt)
+
+
+tt = time.time()
+records = db.session.query(File).filter(
+            File.meta["more"]["keeps_going"].astext == "nice19"
+          ).filter(
+            File.meta["id"].cast(Integer).between(1200,3300)
+          ).all()
+print(time.time()-tt)
+print(len(records))
+
+ 
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+import time
+from sqlalchemy.types import Integer
+from datetime import datetime
+
+
+akey = db.session.query(Accesskey).filter(Accesskey.owner_id == 1).first()
+now = datetime.now()
+
+import requests
+
+key = "SNBopjCzmq53FFdmGghadt4Cf56HpDix"
+
+query = {
+    "creator": {
+        "name": "c2%"
+    },
+    "project": "p1%",
+    "extra": None,
+    "score": 1.2
+}
+
+t = time.time()
+r = requests.post('http://localhost:5000/api/file/search', json=query, headers={"x-api-key": key})
+time.time()-t
+
+r.json()
+
+
+r = requests.get('http://localhost:5000/api/user/accesskey', headers={"x-api-key": key})
+r.json()
+
+r = requests.get('http://localhost:5000/api/user/accesskey', headers={"x-api-key": key})
+r.json()
+
+
+from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+import time
+from sqlalchemy.types import Integer, Float
+from datetime import datetime
+
+def meta_stat(meta, path, stat):
+    for k in meta.keys():
+        if str(type(meta[k])) == "<class 'sqlalchemy_json.track.TrackedList'>":
+            x=1
+        elif str(type(meta[k])) == "<class 'sqlalchemy_json.track.TrackedDict'>":
+            stat = meta_stat(meta[k], path+"/"+k, stat)
+        else:
+            p = path+"/"+k
+            metak = meta[k]
+            if type(metak) == float:
+                metak = str(int(metak))
+            if p in stat.keys():
+                if str(metak) in stat[p].keys():
+                    stat[p][str(metak)] = stat[p][str(metak)]+1
+                else:
+                    stat[p][str(metak)] = 1
+            else:
+                temp = {str(metak): 1}
+                stat[p] = temp
+    return stat
+
+def collect_meta_stats(files, filter=0):
+    stat = {}
+    stat_filtered = {}
+    for f in files:
+        if f.meta != None:
+            stat = meta_stat(f.meta, "", stat)
+    if filter == 0:
+        stat_filtered = stat
+    else:
+        for s in stat.keys():
+            if len(stat[s]) <= filter:
+                stat_filtered[s] = stat[s]
+    return stat_filtered
+
+files = File.query.all()
+res = collect_meta_stats(files, filter=20)
+
+
+import requests
+
+key = "JgCfuwQ68bQZZrnGaj3uHCsEcXNdBzpV"
+
+r = requests.get('http://localhost:5000/api/file/filter', headers={"x-api-key": key})
+r.json()

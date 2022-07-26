@@ -1,6 +1,12 @@
-from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+import traceback
+from app import db, session, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import json
+import jsonschema
+from jsonschema import validate
 import s3utils
+from datetime import datetime
+from sqlalchemy.types import Integer, Float
+import time
 
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
@@ -236,6 +242,24 @@ def list_user_files(user_id):
 def list_collection_files(user_id):
     return []
 
+def search_files(data, user_id):
+    files = filterjson(db.session.query(File), File.meta, data).all()
+    tt = time.time()
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
+    print(time.time()-tt)
+    res_files = []
+    for file in files:
+        if file.uuid in list_creds or file.visibility == "visible":
+            permissions = ["list"]
+            if file.uuid in read_creds:
+                permissions.append("read")
+            if file.uuid in write_creds:
+                permissions.append("write")
+            f = dict(file.__dict__)
+            f.pop('_sa_instance_state', None)
+            res_files.append(f)
+    return res_files
+
 def list_users():
     db_users = User.query.order_by(User.id).all()
     users = []
@@ -293,14 +317,14 @@ def get_scope(userid):
     return (set(list_cred), set(read_cred), set(write_cred))
 
 def add_collection_scope(collection, action, list_cred, read_cred, write_cred):
-    for f in collection.child_file_id:
+    for f in collection.files:
         if action == "list":
             list_cred.append(f.uuid)
         elif action == "write":
             write_cred.append(f.uuid)
         elif action == "read":
             read_cred.append(f.uuid)
-    for c in collection.children:
+    for c in collection.collections:
         add_collection_scope(c, action, list_cred, read_cred, write_cred)
         if action == "list":
             list_cred.append(c.uuid)
@@ -382,14 +406,11 @@ def delete_collection(collection_id):
     return(c)
 
 def get_collection(collection_id, user_id):
-    user_roles = get_user_roles(user_id)
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     collection = Collection.query.filter(Collection.id==collection_id).first()
     sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
     collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
-    print("creds list")
-    print(list_creds)
     for sc in sub_collections:
         if sc.uuid in list_creds or sc.visibility == "visible":
             num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
@@ -472,6 +493,10 @@ def create_access_key(user_id, expiration_time):
     akey = Accesskey(user=user, expiration_time=expiration_time)
     db.session.add(akey)
     db.session.commit()
+    db.session.refresh(akey)
+    k = dict(akey.__dict__)
+    k.pop('_sa_instance_state', None)
+    return  k
 
 def delete_access_key(user_id, key_id):
     if is_admin(user_id) or is_owner_key(user_id, key_id):
@@ -486,6 +511,18 @@ def get_key_user(user_key):
     akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
     user = db.session.query(User).filter(User.id == akey.owner_id).first()
     return user
+
+def key_valid(user_key):
+    try:
+        akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
+        now = datetime.now()
+        key_age = (now-akey.creation_date).seconds/60
+        if key_age < akey.expiration_time:
+            return True
+        else:
+            return False
+    except Exception:
+        return False
 
 def todict(obj, classkey=None):
     if isinstance(obj, dict):
@@ -506,3 +543,80 @@ def todict(obj, classkey=None):
         return data
     else:
         return obj
+
+def validate_json(json_data, schema_data):
+    try:
+        validate(instance=json_data, schema=schema_data)
+    except jsonschema.exceptions.ValidationError as err:
+        traceback.print_exc()
+        return False
+    return True
+
+def filterjson(filter, file, j):
+    jkeys = j.keys()
+    for k in jkeys:
+        if type(j[k]) == int:
+            filter = filter.filter(file[k].cast(Integer) == j[k])
+        elif type(j[k]) == float:
+            filter = filter.filter(file[k].cast(Float) == j[k])
+        elif j[k] == None:
+            filter = filter.filter(file.has_key(k))
+        elif "%" in j[k]:
+            filter = filter.filter(file[k].astext.like(j[k]))
+        elif type(j[k]) == str:
+            filter = filter.filter(file[k].astext == j[k])
+        elif "between" in j[k].keys():
+            filter = filter.filter(file[k].cast(Float) >= j[k]["between"][0]).filter(file[k].cast(Float) <= j[k]["between"][1])
+        else:
+            try:
+                filter = filterjson(filter, file[k], j[k])
+            except Exception:
+                traceback.print_exc()
+    return filter
+
+def annotate_file(file_id, metadata):
+    file = File.query.filter(File.id == file_id).first().meta = metadata
+    db.session.commit()
+    db.session.refresh(file)
+    file = dict(file.__dict__)
+    file.pop('_sa_instance_state', None)
+    return(file)
+
+def meta_stat(meta, path, stat):
+    for k in meta.keys():
+        if str(type(meta[k])) == "<class 'sqlalchemy_json.track.TrackedList'>":
+            x=1
+        elif str(type(meta[k])) == "<class 'sqlalchemy_json.track.TrackedDict'>":
+            stat = meta_stat(meta[k], path+"/"+k, stat)
+        else:
+            p = path+"/"+k
+            metak = meta[k]
+            if type(metak) == float:
+                metak = str(int(metak))
+            if p in stat.keys():
+                if str(metak) in stat[p].keys():
+                    stat[p][str(metak)] = stat[p][str(metak)]+1
+                else:
+                    stat[p][str(metak)] = 1
+            else:
+                temp = {str(metak): 1}
+                stat[p] = temp
+    return stat
+
+def get_filters(user_id):
+    files = File.query.all()
+    return collect_meta_stats(files, filter=20)
+
+def collect_meta_stats(files, filter=0):
+    stat = {}
+    stat_filtered = {}
+    for f in files:
+        if f.meta != None:
+            stat = meta_stat(f.meta, "", stat)
+    if filter == 0:
+        stat_filtered = stat
+    else:
+        for s in stat.keys():
+            if len(stat[s]) <= filter:
+                stat_filtered[s] = stat[s]
+    return stat_filtered
