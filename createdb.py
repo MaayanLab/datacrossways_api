@@ -1,20 +1,20 @@
 
 import sys
-from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+from models import User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
 import copy
 import random
 import json
 from sqlalchemy import create_engine
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 
-def read_config():
-    f = open('secrets/config.json')
-    return json.load(f)
-
-conf = read_config()
+conf = json.load(open('secrets/config.json'))
 
 try:
     dburi = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
-    db = create_engine(url=dburi)
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = dburi
+    db = SQLAlchemy(app)
 except Exception:
     print("Could not connect to Database")
     quit()
