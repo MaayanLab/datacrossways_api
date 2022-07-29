@@ -1,4 +1,4 @@
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import SQLAlchemy
 from pymysql import NULL
 import shortuuid
 from datetime import datetime
