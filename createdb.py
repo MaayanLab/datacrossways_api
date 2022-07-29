@@ -35,7 +35,5 @@ root_collection = Collection(name="root", user=user_1)
 admin_role = Role(name="admin")
 user_1.roles.append(admin_role)
 
-uploader_role = Role(name="uploader")
-
-db.session.add_all([user_1, uploader_role])
+db.session.add(user_1)
 db.session.commit()
