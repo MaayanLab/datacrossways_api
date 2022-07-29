@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-conf = json.load(open('secrets/config.json'))
+conf = json.load(open('../secrets/config.json'))
 
 try:
     dburi = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
