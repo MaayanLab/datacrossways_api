@@ -1,6 +1,6 @@
 
 import sys
-from models import User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+from models import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
 import copy
 import random
 import json
@@ -33,7 +33,6 @@ user_1 = User(name='Alexander Lachmann',
 root_collection = Collection(name="root", user=user_1)
 
 admin_role = Role(name="admin")
-user_1.roles.append(admin_role)
 
 db.session.add(user_1)
 db.session.commit()
