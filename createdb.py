@@ -14,7 +14,9 @@ try:
     dburi = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
     app = Flask(__name__)
     app.config['SQLALCHEMY_DATABASE_URI'] = dburi
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db = SQLAlchemy(app)
+    db.init_app(app)
 except Exception:
     print("Could not connect to Database")
     quit()
