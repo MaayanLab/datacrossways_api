@@ -36,6 +36,13 @@ def is_owner_key(user_id, key_id):
     else:
         return False
 
+def get_user_by_id(db, id):
+    db_user = db.session.query(User).filter(User.id == id).first()
+    user = ""
+    if db_user:
+        user = db_user
+    return user
+
 def get_user(db, response):
     user_info = response.json()
     user = ""
@@ -224,25 +231,26 @@ def delete_file(file_id, user):
     else:
         return 0
 
-def list_files():
-    #db_files = File.query.order_by(File.id).all()
-    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).all()
+def list_files(start, limit):
+    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).offset(start).limit(limit).all()
+    file_count = db.session.query(File.id).filter(File.owner_id == User.id).count()
     files = []
     for file in db_files:
         files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id, 'size': file[0].size})
-    return files
+    return files, file_count
 
-def list_user_files(user_id):
-    db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).all()
+def list_user_files(user_id, start, limit):
+    file_count = File.query.filter_by(owner_id=user_id).order_by(File.id).count()
+    db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(start).limit(limit).all()
     files = []
     for file in db_files:
         files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'size': file.size})
-    return files
+    return files, file_count
 
 def list_collection_files(user_id):
     return []
 
-def search_files(data, user_id):
+def search_files(data, start, limit, user_id):
     files = filterjson(db.session.query(File), File.meta, data).all()
     tt = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
@@ -258,7 +266,7 @@ def search_files(data, user_id):
             f = dict(file.__dict__)
             f.pop('_sa_instance_state', None)
             res_files.append(f)
-    return res_files
+    return res_files[start:(start+limit)], len(res_files)
 
 def list_users():
     db_users = User.query.order_by(User.id).all()

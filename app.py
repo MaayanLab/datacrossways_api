@@ -80,10 +80,12 @@ def get_user():
 @login_required
 def get_user_files():
     try:
-        files = dbutils.list_user_files(session["user"]["id"])
-        return jsonify(files), 200
+        start = request.args.get("from", default=0)
+        limit = request.args.get("limit", default=20)
+        files, file_count = dbutils.list_user_files(session["user"]["id"], start, limit)
+        return jsonify({"message": "files listed successfully", "files": files, "total": file_count}), 200
     except Exception:
-        return jsonify(message="An error occurred when listing users"), 500
+        return jsonify(message="An error occurred when listing files"), 500
 
 @app.route('/api/user', methods = ["POST"])
 @accesskey_login
@@ -136,8 +138,10 @@ def delete_user(user_id):
 @admin_required
 def get_file():
     try:
-        files = dbutils.list_files()
-        return jsonify({"message": "files listed successfully", "files": files})
+        start = request.args.get("from", default=0)
+        limit = request.args.get("limit", default=20)
+        files, file_count = dbutils.list_files(start, limit)
+        return jsonify({"message": "files listed successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
@@ -149,10 +153,10 @@ def get_file():
 def search_file():
     try:
         data = request.get_json()
-        print(data)
-        files = dbutils.search_files(data, session["user"]["id"])
-        paging = []
-        return jsonify({"message": "files searched successfully", "files": files, "paging": paging})
+        start = data.get("from", 0)
+        limit = data.get("limit", 20)
+        files, file_count = dbutils.search_files(data.get("query"), start, limit, session["user"]["id"])
+        return jsonify({"message": "files searched successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when searching files"), 500
@@ -241,7 +245,6 @@ def annotate_file(fileid):
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when annotating file"), 500
-
 
 # ============== file upload functions ===============
 @app.route('/api/file/upload', methods = ['POST'])
@@ -435,7 +438,6 @@ def patch_collection():
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to update collection"), 500
 
-
 @app.route('/api/collection/<int:collection_id>', methods = ["DELETE"])
 def delete_collection(collection_id):
     try:
@@ -498,7 +500,7 @@ def keylogin():
 
 
 # ------------------ Login/Logout ----------------
-@app.route('/api/user/login')
+@app.route('/api/user/login/google')
 def login():
     google = oauth.create_client('google')  # create the google oauth client
     redirect_uri = url_for('authorize', _external=True)
@@ -528,7 +530,7 @@ def authorize():
     #return redirect('/')
     return redirect(conf["redirect"]["url"]+'/myfiles')
 
-@app.route('/api/user/i')
+@app.route('/api/user/i', methods = ['GET'])
 @accesskey_login
 @login_required
 def mycred():
@@ -538,8 +540,6 @@ def mycred():
         return jsonify(message="An error occurred when updating user"), 500
 
 # ------------------- end login -------------------
-
-
 
 # ============== policies ============
 @app.route('/api/policies', methods = ['GET'])

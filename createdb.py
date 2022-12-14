@@ -1,13 +1,17 @@
-from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles
+from app import db, User, Collection, Role
+import sys
+
+email= sys.argv[0]
+first_name = sys.argv[1]
+last_name = sys.argv[2]
 
 db.drop_all()
 db.create_all()
 
-user_1 = User(name='Alexander Lachmann', 
-                first_name="Alexander", 
-                last_name="Lachmann",
-                affiliation="Mount Sinai Hospital",
-                email="alexander.lachmann@gmail.com")
+user_1 = User(name=first_name+last_name, 
+                first_name=first_name, 
+                last_name=last_name,
+                email=email)
 
 root_collection = Collection(name="root", user=user_1)
 
@@ -16,4 +20,3 @@ user_1.roles.append(admin_role)
 
 db.session.add(user_1)
 db.session.commit()
-

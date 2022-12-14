@@ -2,6 +2,23 @@ from flask import session, jsonify
 from functools import wraps
 import dbutils
 from flask import Flask, url_for, redirect, session, request, jsonify
+import json
+
+def read_config():
+    f = open('secrets/config.json')
+    return json.load(f)
+
+conf = read_config()
+
+def dev_login(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if conf["development"] == True:
+            user = dbutils.get_user_by_id(1)
+            session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+            session.permanent = True
+        return f(*args, **kwargs)
+    return decorated_function
 
 def login_required(f):
     @wraps(f)

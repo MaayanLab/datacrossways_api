@@ -33,6 +33,7 @@ class User(db.Model):
     affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid)
+    storage_quota = db.Column(db.Integer, default=100000)
 
     # relationships
     files = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
