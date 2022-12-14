@@ -15,7 +15,7 @@ from models import db, User, File, Collection, Role, UserRole, Policy, RolePolic
 import dbutils
 import s3utils
 
-from middleware import login_required, upload_credentials, admin_required, accesskey_login
+from middleware import login_required, upload_credentials, admin_required, accesskey_login, dev_login
 
 from datetime import timedelta
 
@@ -65,6 +65,7 @@ oauth.register(
 # - user [DELETE] -> delete user
 @app.route('/api/user', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def get_user():
@@ -77,6 +78,7 @@ def get_user():
 
 @app.route('/api/user/files', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 def get_user_files():
     try:
@@ -89,6 +91,7 @@ def get_user_files():
 
 @app.route('/api/user', methods = ["POST"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def post_user():
@@ -102,6 +105,7 @@ def post_user():
 
 @app.route('/api/user', methods = ["PATCH"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def patch_user():
@@ -114,6 +118,7 @@ def patch_user():
         return jsonify(message="An error occurred when updating user"), 500
 
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 @app.route('/api/user/<int:user_id>', methods = ["DELETE"])
@@ -134,6 +139,7 @@ def delete_user(user_id):
 # - file [DELETE] -> delete file
 @app.route('/api/file', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def get_file():
@@ -148,6 +154,7 @@ def get_file():
 
 @app.route('/api/file/search', methods = ["POST"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def search_file():
@@ -163,6 +170,7 @@ def search_file():
 
 @app.route('/api/file/filter', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def get_filters():
@@ -175,6 +183,7 @@ def get_filters():
 
 @app.route('/api/file', methods = ["POST"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def post_file():
@@ -188,6 +197,7 @@ def post_file():
 
 @app.route('/api/file', methods = ["PATCH"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def patch_file():
@@ -200,6 +210,7 @@ def patch_file():
 
 @app.route('/api/file/<int:file_id>', methods = ["DELETE"])
 @accesskey_login
+@dev_login
 @login_required
 def delete_file(file_id):
     try:
@@ -215,6 +226,7 @@ def delete_file(file_id):
 
 @app.route('/api/file/download/<int:fileid>', methods = ['GET'])
 @accesskey_login
+@dev_login
 @login_required
 def download(fileid):
     try:
@@ -232,6 +244,7 @@ def download(fileid):
 
 @app.route('/api/file/annotate/<int:fileid>', methods = ['post'])
 @accesskey_login
+@dev_login
 @login_required
 def annotate_file(fileid):
     try:
@@ -249,6 +262,7 @@ def annotate_file(fileid):
 # ============== file upload functions ===============
 @app.route('/api/file/upload', methods = ['POST'])
 @accesskey_login
+@dev_login
 @login_required
 @upload_credentials
 def upload():
@@ -264,6 +278,7 @@ def upload():
 
 @app.route('/api/file/startmultipart', methods = ['POST'])
 @accesskey_login
+@dev_login
 @login_required
 @upload_credentials
 def startmultipart():
@@ -278,6 +293,7 @@ def startmultipart():
 
 @app.route('/api/file/signmultipart', methods = ['POST'])
 @accesskey_login
+@dev_login
 @login_required
 @upload_credentials
 def signmultipart():
@@ -290,6 +306,7 @@ def signmultipart():
 
 @app.route('/api/file/completemultipart', methods = ['POST'])
 @accesskey_login
+@dev_login
 @login_required
 @upload_credentials
 def completemultipart():
@@ -309,6 +326,7 @@ def completemultipart():
 # - user [DELETE] -> delete role
 @app.route('/api/role', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def get_role():
@@ -319,6 +337,10 @@ def get_role():
         return jsonify(message="An error occurred when attempting to list roles"), 500
 
 @app.route('/api/role', methods = ["POST"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
 def post_role():
     try:
         data = request.get_json()
@@ -332,6 +354,10 @@ def post_role():
         return jsonify(message="An error occurred when attempting to create role"), 500
 
 @app.route('/api/role', methods = ["PATCH"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
 def patch_role():
     try:
         data = request.get_json()
@@ -343,6 +369,10 @@ def patch_role():
 
 
 @app.route('/api/role/<int:role_id>', methods = ["DELETE"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
 def delete_role(role_id):
     try:
         role = dbutils.delete_role(role_id)
@@ -361,6 +391,7 @@ def delete_role(role_id):
 # - user [DELETE] -> delete role
 @app.route('/api/policy', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def get_policy():
@@ -371,6 +402,10 @@ def get_policy():
         return jsonify(message="An error occurred when attempting to list policies"), 500
 
 @app.route('/api/policy', methods = ["POST"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
 def post_policy():
     try:
         data = request.get_json()
@@ -381,6 +416,10 @@ def post_policy():
         return jsonify(message="An error occurred when attempting to create policy"), 500
 
 @app.route('/api/policy/<int:policy_id>', methods = ["DELETE"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
 def delete_policy(policy_id):
     try:
         policy = dbutils.delete_policy(policy_id)
@@ -397,6 +436,8 @@ def delete_policy(policy_id):
 # - user [PATCH] -> update role
 # - user [DELETE] -> delete role
 @app.route('/api/collection', methods = ["GET"])
+@accesskey_login
+@dev_login
 @login_required
 @admin_required
 def get_collections():
@@ -408,6 +449,8 @@ def get_collections():
         return jsonify(message="An error occurred when attempting to list collections"), 500
 
 @app.route('/api/collection/<int:collection_id>', methods = ["GET"])
+@accesskey_login
+@dev_login
 @login_required
 def get_collection(collection_id):
     try:
@@ -419,6 +462,9 @@ def get_collection(collection_id):
 
 
 @app.route('/api/collection', methods = ["POST"])
+@accesskey_login
+@dev_login
+@login_required
 def post_collection():
     try:
         data = request.get_json()
@@ -429,6 +475,9 @@ def post_collection():
         return jsonify(message="An error occurred when attempting to create collection"), 500
 
 @app.route('/api/collection', methods = ["PATCH"])
+@accesskey_login
+@dev_login
+@login_required
 def patch_collection():
     try:
         data = request.get_json()
@@ -439,6 +488,9 @@ def patch_collection():
         return jsonify(message="An error occurred when attempting to update collection"), 500
 
 @app.route('/api/collection/<int:collection_id>', methods = ["DELETE"])
+@accesskey_login
+@dev_login
+@login_required
 def delete_collection(collection_id):
     try:
         collection = dbutils.delete_collection(collection_id)
@@ -455,6 +507,7 @@ def delete_collection(collection_id):
 # - user [DELETE] -> delete role
 @app.route('/api/user/accesskey', methods = ["GET"])
 @accesskey_login
+@dev_login
 @login_required
 def get_access_keys():
     try:
@@ -468,6 +521,7 @@ def get_access_keys():
 
 @app.route('/api/user/accesskey/<int:expiration>', methods = ["POST"])
 @accesskey_login
+@dev_login
 @login_required
 def post_access_key(expiration):
     try:
@@ -479,6 +533,8 @@ def post_access_key(expiration):
         return jsonify(message="An error occurred when creating key"), 500
 
 @app.route('/api/user/accesskey/<int:akey>', methods = ["DELETE"])
+@accesskey_login
+@dev_login
 @login_required
 def delete_access_key(akey):
     try:
@@ -493,6 +549,9 @@ def delete_access_key(akey):
         return jsonify(message="An error occurred when deleting key"), 500
 
 @app.route('/api/user/keylogin', methods=["GET"])
+@accesskey_login
+@dev_login
+@login_required
 def keylogin():
     user = dbutils.get_key_user(user_key)
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
@@ -532,6 +591,7 @@ def authorize():
 
 @app.route('/api/user/i', methods = ['GET'])
 @accesskey_login
+@dev_login
 @login_required
 def mycred():
     try:
@@ -544,6 +604,7 @@ def mycred():
 # ============== policies ============
 @app.route('/api/policies', methods = ['GET'])
 @accesskey_login
+@dev_login
 @login_required
 @admin_required
 def list_policies():
