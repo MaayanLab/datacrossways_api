@@ -557,7 +557,6 @@ def keylogin():
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
     session.permanent = True
 
-
 # ------------------ Login/Logout ----------------
 @app.route('/api/user/login/google')
 def login():
