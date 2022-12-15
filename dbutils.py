@@ -36,7 +36,7 @@ def is_owner_key(user_id, key_id):
     else:
         return False
 
-def get_user_by_id(db, id):
+def get_user_by_id(id):
     db_user = db.session.query(User).filter(User.id == id).first()
     user = ""
     if db_user:
