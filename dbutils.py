@@ -36,6 +36,15 @@ def is_owner_key(user_id, key_id):
     else:
         return False
 
+def get_stats():
+    file_count = db.session.query(File.id).count()
+    collection_count = db.session.query(File.id).count()
+    file_sizes = db.session.query(File.size).all()
+    file_size_sum = 0
+    for file_size in file_sizes:
+        file_size_sum = file_size_sum+file_size
+    return {"files": file_count, "datasets": collection_count, "size": file_size_sum}
+
 def get_user_by_id(id):
     db_user = db.session.query(User).filter(User.id == id).first()
     user = ""

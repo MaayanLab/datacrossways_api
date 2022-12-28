@@ -58,6 +58,15 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
+@app.route('/api/stats', methods = ["GET"])
+def get_stats():
+    try:
+        stats = dbutils.get_stats()
+        return jsonify(stats=stats), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when retrieving stats"), 500
+
 # User API endpoints
 # - user [GET] -> list all users
 # - user [POST]-> create a new user
