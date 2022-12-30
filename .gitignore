@@ -44,3 +44,5 @@ test/*
 requirements_old.txt
 
 db/examples.py
+
+addtestdata.py

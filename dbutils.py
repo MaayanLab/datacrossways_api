@@ -38,11 +38,11 @@ def is_owner_key(user_id, key_id):
 
 def get_stats():
     file_count = db.session.query(File.id).count()
-    collection_count = db.session.query(File.id).count()
+    collection_count = db.session.query(Collection.id).filter(Collection.visibility == "visible").count()
     file_sizes = db.session.query(File.size).all()
     file_size_sum = 0
     for file_size in file_sizes:
-        file_size_sum = file_size_sum+file_size
+        file_size_sum = file_size_sum+file_size[0]
     return {"files": file_count, "datasets": collection_count, "size": file_size_sum}
 
 def get_user_by_id(id):
@@ -445,6 +445,28 @@ def get_collection(collection_id, user_id):
             collection_return["child_files"].append(temp_file)
     collection_return["path"] = get_parent_collection_path(collection_id)
     return collection_return
+
+def get_collection_files(collection_id, offset, limit, user_id):
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
+    print(list_creds)
+    collection = Collection.query.filter(Collection.id==collection_id).first()
+    if collection.uuid in list_creds:
+        files = []
+        sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
+        for file in sub_files:
+            if file.uuid in list_creds or file.visibility == "visible":
+                permissions = ["list"]
+                if file.uuid in read_creds:
+                    permissions.append("read")
+                if file.uuid in write_creds:
+                    permissions.append("write")
+                temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
+                files.append(temp_file)
+        offset = max(offset, 0)
+        limit = min(limit, len(files)-1)
+        return files[offset:(offset+limit)]
+    else:
+        return []
 
 def get_parent_collection_path(collection_id):
     collection_path = []

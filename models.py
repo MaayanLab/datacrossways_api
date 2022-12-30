@@ -96,7 +96,7 @@ class Collection(db.Model):
     creation_date = db.Column(db.DateTime, default=datetime.now)
     parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
-    visibility = db.Column(db.String(), default="visible")
+    visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="open")
 
     # relationships

@@ -77,12 +77,11 @@ for r in range(10000):
     }
     if r%2 == 0:
         metadata["extra"] = r
-    f = File(name="file_"+str(r)+".txt", user=user_1, collection=lyme_collection, meta=copy.deepcopy(metadata))
+    f = File(name="file_"+str(r)+".txt", user=user_1, collection=lyme_collection, size=random.uniform(1000, 1000000), meta=copy.deepcopy(metadata))
     uif.append(f)
 
 db.session.add_all(uif)
 db.session.commit()
-
 
 policy_1 = Policy(effect="allow", action="list")
 policy_2 = Policy(effect="allow", action="read")
@@ -93,6 +92,9 @@ policy_2.collections.append(root_collection)
 
 admin_role = Role(name="admin")
 user_1.roles.append(admin_role)
+
+uploader_role = Role(name="uploader")
+user_1.roles.append(uploader_role)
 
 base_reader = Role(name="base_reader")
 base_reader.policies.append(policy_1)

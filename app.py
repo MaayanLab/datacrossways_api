@@ -62,7 +62,7 @@ oauth.register(
 def get_stats():
     try:
         stats = dbutils.get_stats()
-        return jsonify(stats=stats), 200
+        return jsonify(stats), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when retrieving stats"), 500
@@ -461,14 +461,27 @@ def get_collections():
 @accesskey_login
 @dev_login
 @login_required
-def get_collection(collection_id):
+def get_collection_id(collection_id):
     try:
         user = dict(session).get('user', None)
-        collections = dbutils.get_collection(collection_id, user["id"])
-        return jsonify({"message": "collections listed successfully", "collections": files})
+        collection = dbutils.get_collection(collection_id, user["id"])
+        return jsonify(collection)
     except Exception:
         traceback.print_exc()
 
+@app.route('/api/collection/<int:collection_id>/files', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+def get_collection_files(collection_id):
+    try:
+        offset = request.args.get("offset", 0)
+        limit = request.args.get("limit", 20)
+        user = dict(session).get('user', None)
+        collection = dbutils.get_collection_files(collection_id, offset, limit, user["id"])
+        return jsonify(collection)
+    except Exception:
+        traceback.print_exc()
 
 @app.route('/api/collection', methods = ["POST"])
 @accesskey_login
