@@ -85,7 +85,7 @@ def get_user():
         traceback.print_exc()
         return jsonify(message="An error occurred when listing users"), 500
 
-@app.route('/api/user/files', methods = ["GET"])
+@app.route('/api/user/file', methods = ["GET"])
 @accesskey_login
 @dev_login
 @login_required
@@ -153,10 +153,25 @@ def delete_user(user_id):
 @admin_required
 def get_file():
     try:
-        start = request.args.get("from", default=0)
-        limit = request.args.get("limit", default=20)
-        files, file_count = dbutils.list_files(start, limit)
-        return jsonify({"message": "files listed successfully", "files": files, "total": file_count})
+        offset = int(request.args.get("offset", default=0))
+        limit = int(request.args.get("limit", default=20))
+        files, file_count = dbutils.list_files(offset, limit)
+        return jsonify({"message": "files listed successfully", "files": files, "total_files": file_count})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing files"), 500
+
+@app.route('/api/file/detail', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_file_detail():
+    try:
+        offset = int(request.args.get("offset", default=0))
+        limit = int(request.args.get("limit", default=20))
+        files, file_count = dbutils.list_files_detail(offset, limit)
+        return jsonify({"message": "files listed successfully", "files": files, "total_files": file_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
@@ -169,9 +184,11 @@ def get_file():
 def search_file():
     try:
         data = request.get_json()
-        start = data.get("from", 0)
-        limit = data.get("limit", 20)
-        files, file_count = dbutils.search_files(data.get("query"), start, limit, session["user"]["id"])
+        offset = int(data.get("offset", 0))
+        limit = int(data.get("limit", 20))
+        collection_id = data.get("collection_id", None)
+        collection_id = int(collection_id) if collection_id else None
+        files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, offset, limit)
         return jsonify({"message": "files searched successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
@@ -184,7 +201,9 @@ def search_file():
 @admin_required
 def get_filters():
     try:
-        filters = dbutils.get_filters(session["user"]["id"])
+        filter_number_category = int(request.args.get("category_filter", default=20))
+        filter_number_option = int(request.args.get("option_filter", default=20))
+        filters = dbutils.get_filters(session["user"]["id"], filter_number_category, filter_number_option)
         return jsonify({"message": "file filter retrieved successfully", "filters": filters})
     except Exception:
         traceback.print_exc()
@@ -475,8 +494,8 @@ def get_collection_id(collection_id):
 @login_required
 def get_collection_files(collection_id):
     try:
-        offset = request.args.get("offset", 0)
-        limit = request.args.get("limit", 20)
+        offset = int(request.args.get("offset", 0))
+        limit = int(request.args.get("limit", 20))
         user = dict(session).get('user', None)
         collection = dbutils.get_collection_files(collection_id, offset, limit, user["id"])
         return jsonify(collection)
@@ -620,6 +639,18 @@ def mycred():
     except Exception:
         return jsonify(message="An error occurred when updating user"), 500
 
+
+@app.route('/api/user/<int:user_id>', methods = ['GET'])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def user_by_id(user_id):
+    try:
+        return dbutils.get_user_by_id_json(user_id), 200
+    except Exception:
+        return jsonify(message="An error occurred when getting user"), 500
+
 # ------------------- end login -------------------
 
 # ============== policies ============
@@ -633,6 +664,10 @@ def list_policies():
     return jsonify(policies)
 
 # ----------- Proxy to next.js frontend -----------
+
+@app.route('/favicon.ico')
+def nothing():
+    return Response()
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

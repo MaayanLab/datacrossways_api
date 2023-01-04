@@ -45,6 +45,16 @@ def get_stats():
         file_size_sum = file_size_sum+file_size[0]
     return {"files": file_count, "datasets": collection_count, "size": file_size_sum}
 
+def get_user_by_id_json(id):
+    db_user = db.session.query(User).filter(User.id == id).first()
+    user = ""
+    if db_user:
+        role_list = []
+        for role in db_user.roles:
+            role_list.append(role.name)   
+        user = {"id": db_user.id, "name": db_user.name, "first_name": db_user.first_name, "last_name": db_user.last_name, "email": db_user.email, "affiliation": db_user.affiliation, "creation_date": db_user.creation_date, "uuid": db_user.uuid, "storage_quota": db_user.storage_quota, "roles": role_list}
+    return user
+
 def get_user_by_id(id):
     db_user = db.session.query(User).filter(User.id == id).first()
     user = ""
@@ -240,17 +250,30 @@ def delete_file(file_id, user):
     else:
         return 0
 
-def list_files(start, limit):
-    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).offset(start).limit(limit).all()
+def list_files(offset, limit):
+    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).offset(offset).limit(limit).all()
     file_count = db.session.query(File.id).filter(File.owner_id == User.id).count()
     files = []
     for file in db_files:
         files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id, 'size': file[0].size})
     return files, file_count
 
-def list_user_files(user_id, start, limit):
+def list_files_detail(offset, limit):
+    db_files = db.session.query(File, User, Collection).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).order_by(File.id).offset(offset).limit(limit).all()
+    file_count = db.session.query(File.id).filter(File.owner_id == User.id).count()
+    files = []
+    for file in db_files:
+        owner = file[1]
+        collection = file[2]
+        owner_result = {"first_name": owner.first_name, "last_name": owner.last_name, "id": owner.id, "uuid": owner.uuid}
+        collection_result = {"id": collection.id, "name": collection.name, "uuid": collection.uuid}
+        file_result = {"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": owner_result, "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection': collection_result, 'size': file[0].size}
+        files.append(file_result)
+    return files, file_count
+
+def list_user_files(user_id, offset, limit):
     file_count = File.query.filter_by(owner_id=user_id).order_by(File.id).count()
-    db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(start).limit(limit).all()
+    db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(offset).limit(limit).all()
     files = []
     for file in db_files:
         files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'size': file.size})
@@ -259,8 +282,11 @@ def list_user_files(user_id, start, limit):
 def list_collection_files(user_id):
     return []
 
-def search_files(data, start, limit, user_id):
-    files = filterjson(db.session.query(File), File.meta, data).all()
+def search_files(data, user_id, collection_id, offset=0, limit=20):
+    if collection_id is not None:
+        files = filterjson(db.session.query(File).filter(File.collection_id == collection_id), File.meta, data).all()
+    else:
+        files = filterjson(db.session.query(File), File.meta, data).all()
     tt = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     print(time.time()-tt)
@@ -275,7 +301,20 @@ def search_files(data, start, limit, user_id):
             f = dict(file.__dict__)
             f.pop('_sa_instance_state', None)
             res_files.append(f)
-    return res_files[start:(start+limit)], len(res_files)
+    print(len(res_files))
+    res_files_page = res_files[offset:(offset+limit)]
+
+    return add_file_detail(res_files_page), len(res_files)
+
+def add_file_detail(files):
+    for file in files:
+        file_details = db.session.query(File, User, Collection).filter(File.id == file["id"]).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).all()[0]
+        print(file_details)
+        owner = {"id": file_details[1].id, "first_name": file_details[1].first_name, "last_name": file_details[1].last_name}
+        collection = {"id": file_details[2].id, "name": file_details[2].name}
+        file["owner"] = owner
+        file["collection"] = collection
+    return files
 
 def list_users():
     db_users = User.query.order_by(User.id).all()
@@ -426,31 +465,35 @@ def get_collection(collection_id, user_id):
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     collection = Collection.query.filter(Collection.id==collection_id).first()
     sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
-    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
-    for sc in sub_collections:
-        if sc.uuid in list_creds or sc.visibility == "visible":
-            num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
-            num_files = File.query.filter(File.collection_id==sc.id).count()
-            temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid, "parent_collection_id": sc.parent_collection_id, "date": sc.creation_date, "owner_id": sc.owner_id, "child_collections": num_collections, "child_files": num_files}
-            collection_return["child_collections"].append(temp_collection)
-    for file in sub_files:
-        if file.uuid in list_creds or file.visibility == "visible":
-            permissions = ["list"]
-            if file.uuid in read_creds:
-                permissions.append("read")
-            if file.uuid in write_creds:
-                permissions.append("write")
-            temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
-            collection_return["child_files"].append(temp_file)
+    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "collections": len(sub_collections), "files": len(sub_files)}
+    # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
+    
+    # for sc in sub_collections:
+    #     if sc.uuid in list_creds or sc.visibility == "visible":
+    #         num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
+    #         num_files = File.query.filter(File.collection_id==sc.id).count()
+    #         temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid, "parent_collection_id": sc.parent_collection_id, "date": sc.creation_date, "owner_id": sc.owner_id, "child_collections": num_collections, "child_files": num_files}
+    #         collection_return["child_collections"].append(temp_collection)
+    # for file in sub_files:
+    #     if file.uuid in list_creds or file.visibility == "visible":
+    #         permissions = ["list"]
+    #         if file.uuid in read_creds:
+    #             permissions.append("read")
+    #         if file.uuid in write_creds:
+    #             permissions.append("write")
+    #         temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
+    #         collection_return["child_files"].append(temp_file)
     collection_return["path"] = get_parent_collection_path(collection_id)
     return collection_return
 
 def get_collection_files(collection_id, offset, limit, user_id):
+    import time
+    st = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
-    print(list_creds)
     collection = Collection.query.filter(Collection.id==collection_id).first()
-    if collection.uuid in list_creds:
+    print(time.time()-st)
+    if collection.uuid in list_creds or is_admin(user_id):
         files = []
         sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
         for file in sub_files:
@@ -464,7 +507,7 @@ def get_collection_files(collection_id, offset, limit, user_id):
                 files.append(temp_file)
         offset = max(offset, 0)
         limit = min(limit, len(files)-1)
-        return files[offset:(offset+limit)]
+        return {"files": files[offset:(offset+limit)], "total_files": len(files)}
     else:
         return []
 
@@ -642,20 +685,27 @@ def meta_stat(meta, path, stat):
                 stat[p] = temp
     return stat
 
-def get_filters(user_id):
+def get_filters(user_id, filter_number_category=20, filter_number_option=10):
     files = File.query.all()
-    return collect_meta_stats(files, filter=20)
+    return collect_meta_stats(files, filter_number_category=filter_number_category, filter_number_option=filter_number_option)
 
-def collect_meta_stats(files, filter=0):
+def collect_meta_stats(files, filter_number_category=20, filter_number_option=10):
     stat = {}
-    stat_filtered = {}
+    filter_result = []
     for f in files:
         if f.meta != None:
             stat = meta_stat(f.meta, "", stat)
     if filter == 0:
-        stat_filtered = stat
+        for s in stat.keys():
+            filter_result.append({"category": s, "detail": stat[s]})
     else:
         for s in stat.keys():
-            if len(stat[s]) <= filter:
-                stat_filtered[s] = stat[s]
-    return stat_filtered
+            file_count = 0
+            temp_stat = {}
+            for key in stat[s].keys():
+                if stat[s][key] >= filter_number_option:
+                    file_count = file_count+stat[s][key]
+                    temp_stat[key] = stat[s][key]
+            if file_count >= filter_number_category:
+                filter_result.append({"category": s, "detail": temp_stat})
+    return filter_result
