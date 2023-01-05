@@ -590,7 +590,7 @@ def delete_access_key(user_id, key_id):
         return 0
 
 def get_key_user(user_key):
-    akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
+    akey = db.session.query(Accesskey).filte(Accesskey.uuid == user_key).first()
     user = db.session.query(User).filter(User.id == akey.owner_id).first()
     return user
 
@@ -709,3 +709,17 @@ def collect_meta_stats(files, filter_number_category=20, filter_number_option=10
             if file_count >= filter_number_category:
                 filter_result.append({"category": s, "detail": temp_stat})
     return filter_result
+
+def get_file_metadata(db, file_id, user_id):
+    file = db.session.query(File).filter(File.id == file_id).first()
+    return file.meta
+
+def get_file_by_id(file_id, user_id):
+    file = File.query.filter(File.id == file_id).first()
+    file = db.session.query(File, User, Collection).filter(File.id == file_id).filter(File.collection_id == Collection.id).first()
+    owner = file[1]
+    collection = file[2]
+    owner_result = {"first_name": owner.first_name, "last_name": owner.last_name, "id": owner.id, "uuid": owner.uuid}
+    collection_result = {"id": collection.id, "name": collection.name, "uuid": collection.uuid}
+    file_result = {"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": owner_result, "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection': collection_result, 'size': file[0].size, 'meta': file[0].meta}
+    return file_result

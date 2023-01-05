@@ -19,6 +19,16 @@ from middleware import login_required, upload_credentials, admin_required, acces
 
 from datetime import timedelta
 
+from werkzeug.routing import BaseConverter
+from flask_caching import Cache
+
+class IntListConverter(BaseConverter):
+    regex = r'\d+(?:,\d+)*,?'
+    def to_python(self, value):
+        return [int(x) for x in value.split(',')]
+    def to_url(self, value):
+        return ','.join(str(x) for x in value)
+
 import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -36,6 +46,10 @@ cors = CORS(app, resources={r"/*": {"origins": "*"}})
 app.secret_key = "ffx#xkj$WWs2"
 app.config['SESSION_COOKIE_NAME'] = 'google-login-session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
+
+app.url_map.converters['int_list'] = IntListConverter
+
+cache = Cache(app, config={"CACHE_TYPE": "simple"})
 
 conf = read_config()
 
@@ -59,6 +73,7 @@ oauth.register(
 )
 
 @app.route('/api/stats', methods = ["GET"])
+@cache.cached(timeout=60)
 def get_stats():
     try:
         stats = dbutils.get_stats()
@@ -236,6 +251,47 @@ def patch_file():
     except Exception:
         return jsonify(message="An error occurred when updating file"), 500
 
+@app.route('/api/file/metadata/<int:file_id>', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_file_meta(file_id):
+    try:
+        metadata = dbutils.get_file_metadata(db, file_id, session["user"]["id"])
+        return jsonify(meta=metadata), 200
+    except Exception:
+        return jsonify(message="An error occurred when retrieving metadata for file"), 500
+
+@app.route('/api/file/metadata/list/<int_list:file_ids>', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_file_meta_list(file_ids):
+    try:
+        metas = []
+        for file_id in file_ids:
+            metadata = dbutils.get_file_metadata(db, file_id, session["user"]["id"])
+            metas.append({"id": file_id, "metadata": metadata})
+        return jsonify(meta=metas), 200
+    except Exception:
+        return jsonify(message="An error occurred when retrieving metadata for files"), 500
+
+
+@app.route('/api/file/<int:file_id>', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+def get_file_by_id(file_id):
+    try:
+        res = dbutils.get_file_by_id(file_id, dict(session).get('user', None))
+        return jsonify(res), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to retrieve file"), 500
+
+
 @app.route('/api/file/<int:file_id>', methods = ["DELETE"])
 @accesskey_login
 @dev_login
@@ -266,6 +322,24 @@ def download(fileid):
             return jsonify({"message": "URL signed", "url": response}), 200
         else:
             return jsonify(message="No permission to download file"), 403
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to sign URL"), 500
+
+@app.route('/api/file/download/list/<int_list:fileids>', methods = ['GET'])
+@accesskey_login
+@dev_login
+@login_required
+def download_list(fileids):
+    try:
+        user = dict(session).get('user', None)
+        url_list = []
+        for fileid in fileids:
+            if dbutils.is_owner_file(user["id"], fileid) or dbutils.is_admin(user["id"]):
+                db_file = dbutils.get_file(fileid)
+                response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
+                url_list.append({"id": fileid, "url": response})
+        return jsonify(urls=url_list), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to sign URL"), 500
@@ -598,6 +672,21 @@ def keylogin():
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
     session.permanent = True
 
+@app.route('/api/news', methods=["GET"])
+@cache.cached(timeout=60)
+def get_news():
+    url = "https://api.twitter.com/2/users/"+str(conf["social"]["twitter"]["account_id"])+"/tweets?tweet.fields=created_at,public_metrics"
+    headers = {
+        "Authorization": "Bearer "+conf["social"]["twitter"]["bearer_token"]
+    }
+    response = requests.get(url, headers=headers)
+
+    
+    if response.status_code == 200:
+        return response.json(), 200
+    else:
+        return jsonify(message="An error occurred when getting news"), 500
+
 # ------------------ Login/Logout ----------------
 @app.route('/api/user/login/google')
 def login():
@@ -686,3 +775,4 @@ def proxy(*args, **kwargs):
 
     response = Response(resp.content, resp.status_code, headers)
     return response
+

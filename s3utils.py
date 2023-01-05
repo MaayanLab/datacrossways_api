@@ -37,7 +37,7 @@ def sign_get_file(file_name, cred):
     url = s3_client.generate_presigned_url(
         ClientMethod='get_object',
         Params={
-            'Bucket': cred["bucket_name"],
+            'Bucket': cred["bucket"],
             'Key': file_name,
         },
         ExpiresIn=60*60
@@ -48,7 +48,7 @@ def sign_upload_file(file_name, cred):
 
     s3_client = get_aws_client(cred)
 
-    response = s3_client.generate_presigned_post(cred["bucket_name"],
+    response = s3_client.generate_presigned_post(cred["bucket"],
         file_name,
         Fields=None,
         Conditions=None,
@@ -73,7 +73,7 @@ def sign_multipart(filename, upload_id, part_number, cred):
 def complete_multipart(filename, upload_id, parts, cred):
     s3_client = get_aws_client(cred)
     res = s3_client.complete_multipart_upload(
-        Bucket=cred["bucket_name"],
+        Bucket=cred["bucket"],
         Key=filename,
         MultipartUpload={'Parts': parts},
         UploadId=upload_id)
