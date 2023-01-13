@@ -32,7 +32,7 @@ class User(db.Model):
     email = db.Column(db.String(), unique=True)
     affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
-    uuid = db.Column(db.String(), default=generate_uuid)
+    uuid = db.Column(db.String(), default=generate_uuid, index=True)
     storage_quota = db.Column(db.Integer, default=100000)
 
     # relationships
@@ -63,19 +63,19 @@ class File(db.Model):
     __tablename__ = 'files'
  
     id = db.Column(db.Integer, primary_key = True)
-    name = db.Column(db.String())
-    display_name = db.Column(db.String(), default=default_name)
-    uuid = db.Column(db.String(), default=generate_uuid)
+    name = db.Column(db.String(), index=True)
+    display_name = db.Column(db.String(), default=default_name, index=True)
+    uuid = db.Column(db.String(), default=generate_uuid, index=True)
     status = db.Column(db.String(), default="uploading")
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="locked")
     description = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     size = db.Column(db.Integer(), default=0)
-    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
-    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
+    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
+    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'), index=True)
 
-    meta = db.Column(mutable_json_type(dbtype=JSONB, nested=True))
+    meta = db.Column(mutable_json_type(dbtype=JSONB, nested=True), index=True)
     
     def __repr__(self):
         return f"{self.id}: {self.name}: {self.uuid}"
@@ -89,13 +89,13 @@ class Collection(db.Model):
     __tablename__ = 'collections'
     
     id = db.Column(db.Integer, primary_key = True)
-    name = db.Column(db.String())
-    uuid = db.Column(db.String(), default=generate_uuid)
+    name = db.Column(db.String(), index=True)
+    uuid = db.Column(db.String(), default=generate_uuid, index=True)
     description = db.Column(db.String())
     image_url = db.Column(db.String(), default="https://datacrosswayspublic.s3.amazonaws.com/collections/collection.jpg")
     creation_date = db.Column(db.DateTime, default=datetime.now)
-    parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'))
-    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
+    parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'), index=True)
+    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="open")
 
@@ -119,7 +119,7 @@ class Accesskey(db.Model):
     uuid = db.Column(db.String(), default=generate_key)
     creation_date = db.Column(db.DateTime, default=datetime.now)
     expiration_time = db.Column(db.Integer, default=1440)
-    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
+    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
 
 
 # Define the Role data-model
@@ -141,8 +141,8 @@ class Role(db.Model):
 class PolicyCollections(db.Model):
     __tablename__ = 'policy_collections'
     id = db.Column(db.Integer(), primary_key=True)
-    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
-    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', ondelete='CASCADE'))
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'), index=True)
+    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', ondelete='CASCADE'), index=True)
 
 class PolicyFiles(db.Model):
     __tablename__ = 'policy_files'
@@ -154,8 +154,8 @@ class PolicyFiles(db.Model):
 class UserRole(db.Model):
     __tablename__ = 'user_roles'
     id = db.Column(db.Integer(), primary_key=True)
-    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'))
-    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
+    user_id = db.Column(db.Integer(), db.ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'), index=True)
 
     def __repr__(self):
         return f"{self.id}-{self.user_id}-{self.role_id}"
@@ -163,18 +163,18 @@ class UserRole(db.Model):
 class RolePolicy(db.Model):
     __tablename__ = 'role_policy'
     id = db.Column(db.Integer(), primary_key=True)
-    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'))
-    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'))
+    role_id = db.Column(db.Integer(), db.ForeignKey('roles.id', ondelete='CASCADE'), index=True)
+    policy_id = db.Column(db.Integer(), db.ForeignKey('policies.id', ondelete='CASCADE'), index=True)
 
 class Policy(db.Model):
     __tablename__ = 'policies'
     id = db.Column(db.Integer(), primary_key=True)
 
     # should be usually allow, but could be Deny
-    effect = db.Column(db.String(10))
+    effect = db.Column(db.String(10), index=True)
 
     # e.g. list/read/write
-    action = db.Column(db.String(100))
+    action = db.Column(db.String(100), index=True)
 
     creation_date = db.Column(db.DateTime, default=datetime.now)
 

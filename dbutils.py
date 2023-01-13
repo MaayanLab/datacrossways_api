@@ -7,6 +7,7 @@ import s3utils
 from datetime import datetime
 from sqlalchemy.types import Integer, Float
 import time
+from sqlalchemy import or_
 
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
@@ -283,14 +284,19 @@ def list_collection_files(user_id):
     return []
 
 def search_files(data, user_id, collection_id, offset=0, limit=20):
-    if collection_id is not None:
-        files = filterjson(db.session.query(File).filter(File.collection_id == collection_id), File.meta, data).all()
-    else:
-        files = filterjson(db.session.query(File), File.meta, data).all()
     tt = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     print(time.time()-tt)
+    tt = time.time()
+    if collection_id is not None:
+        files = filterjson(db.session.query(File).filter(File.collection_id == collection_id), File.meta, data).all()
+    else:
+        #files = filterjson(db.session.query(File), File.meta, data).all()
+        files = filterjson(db.session.query(File), File.meta, data).filter(or_(File.visibility == "visible", File.uuid.in_(set(list_creds))))
+    print(time.time()-tt)
+    
     res_files = []
+    tt = time.time()
     for file in files:
         if file.uuid in list_creds or file.visibility == "visible":
             permissions = ["list"]
@@ -302,6 +308,7 @@ def search_files(data, user_id, collection_id, offset=0, limit=20):
             f.pop('_sa_instance_state', None)
             res_files.append(f)
     print(len(res_files))
+    print(time.time()-tt)
     res_files_page = res_files[offset:(offset+limit)]
 
     return add_file_detail(res_files_page), len(res_files)

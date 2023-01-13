@@ -72,6 +72,17 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
+oauth.register(
+    name = "orcid",
+    client_id = conf["oauth"]["orcid"]["client_id"],
+    client_secret = conf["oauth"]["orcid"]["client_secret"],
+    base_url='https://pub.orcid.org/v3.0/',
+    request_token_url=None,
+    access_token_url='https://orcid.org/oauth/token',
+    authorize_url='https://orcid.org/oauth/authorize',
+    client_kwargs={'scope': 'openid email profile'}
+)
+
 @app.route('/api/stats', methods = ["GET"])
 @cache.cached(timeout=60)
 def get_stats():
@@ -203,7 +214,10 @@ def search_file():
         limit = int(data.get("limit", 20))
         collection_id = data.get("collection_id", None)
         collection_id = int(collection_id) if collection_id else None
+        import time
+        tt = time.time()
         files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, offset, limit)
+        print("all:", time.time()-tt)
         return jsonify({"message": "files searched successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
@@ -691,8 +705,14 @@ def get_news():
 @app.route('/api/user/login/google')
 def login():
     google = oauth.create_client('google')  # create the google oauth client
-    redirect_uri = url_for('authorize', _external=True)
+    redirect_uri = url_for('authorize', provider="google", _external=True)
     return google.authorize_redirect(redirect_uri)
+
+@app.route('/api/user/login/orcid')
+def login_orcid():
+    orcid = oauth.create_client('orcid')  # create the orcid oauth client
+    redirect_uri = url_for('authorize', provider="orcid", _external=True)
+    return orcid.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/logout')
 @accesskey_login
@@ -704,10 +724,17 @@ def logout():
 
 @app.route('/api/user/authorize')
 def authorize():
-    google = oauth.create_client("google")
-    token = google.authorize_access_token()
-    response = google.get('userinfo', token=token)
-    print(response.content)
+    provider = request.args.get('provider')
+    if provider == "google":
+        google = oauth.create_client("google")
+        token = google.authorize_access_token()
+        response = google.get('userinfo', token=token)
+        print(response.content)
+    elif provider == "orcid":
+        orcid = oauth.create_client("orcid")
+        token = orcid.authorize_access_token()
+        response = orcid.get('userinfo', token=token)
+        print(response.content)
     user = dbutils.get_user(db, response)
     user.admin = dbutils.is_admin(user.id)
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
