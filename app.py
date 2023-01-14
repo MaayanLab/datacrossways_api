@@ -735,7 +735,9 @@ def authorize():
     elif provider == "orcid":
         orcid = oauth.create_client("orcid")
         token = orcid.authorize_access_token()
-        response = orcid.get('userinfo', token=token)
+        orcid_id = request.args.get('orcid_id')
+        response = orcid.get(f'/v2.1/{orcid_id}/person', token=token)
+        #response = orcid.get('userinfo', token=token)
         print(response.content)
     user = dbutils.get_user(db, response)
     user.admin = dbutils.is_admin(user.id)
