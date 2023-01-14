@@ -711,7 +711,9 @@ def login():
 @app.route('/api/user/login/orcid')
 def login_orcid():
     orcid = oauth.create_client('orcid')  # create the orcid oauth client
-    redirect_uri = url_for('authorize', provider="orcid", _external=True)
+    #redirect_uri = url_for('authorize', provider="orcid", _external=True)
+    redirect_uri = "https://lymecommons.org/api/user/authorize?provider=orcid"
+    print(redirect_uri)
     return orcid.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/logout')
