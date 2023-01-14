@@ -737,6 +737,7 @@ def authorize():
         token = orcid.authorize_access_token()
         orcid_id = request.args.get('orcid_id')
         response = orcid.get(f'/v2.1/{orcid_id}/person', token=token)
+        #email = response.get("email")
         #response = orcid.get('userinfo', token=token)
         print(response.content)
     user = dbutils.get_user(db, response)
