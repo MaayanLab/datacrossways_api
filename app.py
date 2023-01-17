@@ -117,11 +117,12 @@ def get_user():
 @login_required
 def get_user_files():
     try:
-        start = request.args.get("offset", default=0)
+        offset = request.args.get("offset", default=0)
         limit = request.args.get("limit", default=20)
-        files, file_count = dbutils.list_user_files(session["user"]["id"], start, limit)
+        files, file_count = dbutils.list_user_files(session["user"]["id"], offset, limit)
         return jsonify({"message": "files listed successfully", "files": files, "total": file_count}), 200
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
 
 @app.route('/api/user', methods = ["POST"])

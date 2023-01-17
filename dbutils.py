@@ -269,9 +269,10 @@ def list_files_detail(offset, limit):
     return files, file_count
 
 def list_user_files(user_id, offset, limit):
-    file_count = File.query.filter_by(owner_id=user_id).order_by(File.id).count()
+    #file_count = File.query.filter_by(File.owner_id=user_id).order_by(File.id).count()
+    file_count = db.session.query(File).filter(File.owner_id == user_id).count()
     #db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(offset).limit(limit).all()
-    db_files = db.session.query(File, User, Collection).filter(owner_id=user_id).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).order_by(File.id).offset(offset).limit(limit).all()
+    db_files = db.session.query(File, User, Collection).filter(File.owner_id == user_id).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).order_by(File.id).offset(offset).limit(limit).all()
     files = []
     for file in db_files:
         owner = file[1]
