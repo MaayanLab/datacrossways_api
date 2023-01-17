@@ -274,10 +274,16 @@ def list_files_detail(offset, limit):
 
 def list_user_files(user_id, offset, limit):
     file_count = File.query.filter_by(owner_id=user_id).order_by(File.id).count()
-    db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(offset).limit(limit).all()
+    #db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(offset).limit(limit).all()
+    db_files = db.session.query(File, User, Collection).filter(owner_id=user_id).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).order_by(File.id).offset(offset).limit(limit).all()
     files = []
     for file in db_files:
-        files.append({"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'size': file.size})
+        owner = file[1]
+        collection = file[2]
+        owner_result = {"first_name": owner.first_name, "last_name": owner.last_name, "id": owner.id, "uuid": owner.uuid}
+        collection_result = {"id": collection.id, "name": collection.name, "uuid": collection.uuid}
+        file_result = {"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": owner_result, "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection': collection_result, 'size': file[0].size}
+        files.append(file_result)
     return files, file_count
 
 def list_collection_files(user_id):
@@ -470,10 +476,14 @@ def delete_collection(collection_id):
 
 def get_collection(collection_id, user_id):
     (list_creds, read_creds, write_creds) = get_scope(user_id)
-    collection = Collection.query.filter(Collection.id==collection_id).first()
+    #collection = Collection.query.filter(Collection.id==collection_id).first()
+    query_result = db.session.query(Collection, User).filter(Collection.id==collection_id).filter(User.id == Collection.owner_id).first()
+    collection = query_result[0]
+    db_owner = query_result[1]
+    owner = {"id": db_owner.id, "name": db_owner.name, "firstname": db_owner.first_name, "lastname": db_owner.last_name, "affiliation": db_owner.affiliation}
     sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
     sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
-    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "collections": len(sub_collections), "files": len(sub_files)}
+    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "owner": owner, "image_url": collection.image_url, "collections": len(sub_collections), "files": len(sub_files)}
     # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     
     # for sc in sub_collections:

@@ -117,7 +117,7 @@ def get_user():
 @login_required
 def get_user_files():
     try:
-        start = request.args.get("from", default=0)
+        start = request.args.get("offset", default=0)
         limit = request.args.get("limit", default=20)
         files, file_count = dbutils.list_user_files(session["user"]["id"], start, limit)
         return jsonify({"message": "files listed successfully", "files": files, "total": file_count}), 200
