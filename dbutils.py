@@ -78,17 +78,17 @@ def get_user(db, response):
 
 def create_user(user_info):
     if db.session.query(User).filter(User.email == user_info["email"]).first() is None:
-        collections = user_info["collections"]
-        files = user_info["files"]
-        roles = user_info["roles"]
-        user_info.pop("collections", None)
-        user_info.pop("files", None)
-        user_info.pop("roles", None)
+        #collections = user_info.get("collections", None)
+        #files = user_info.get("files", None)
+        #roles = user_info.get("collections", None)
+        #user_info.pop("collections", None)
+        #user_info.pop("files", None)
+        #user_info.pop("roles", None)
         user = User(**user_info)
 
-        user.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
-        user.files  = db.session.query(File).filter(File.id.in_(files)).all()
-        user.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
+        #user.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
+        #user.files  = db.session.query(File).filter(File.id.in_(files)).all()
+        #user.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
 
         db.session.add(user)
         db.session.commit()
@@ -99,10 +99,6 @@ def create_user(user_info):
 
 def delete_user(user_id):
     dbuser = db.session.query(User).filter(User.id == user_id).first()
-    owned = db.session.query(File).filter(File.owner_id == user_id).all()
-    [db.session.delete(x) for x in owned]
-    owned = db.session.query(Collection).filter(Collection.owner_id == user_id).all()
-    [db.session.delete(x) for x in owned]
     r = print_user(dbuser)
     User.query.filter_by(id=user_id).delete()
     db.session.commit()
@@ -114,16 +110,16 @@ def update_user(user):
     user.pop("uuid", None)
     user.pop("id", None)
 
-    collections = user["collections"]
-    files = user["files"]
-    roles = user["roles"]
-    user.pop("collections", None)
-    user.pop("files", None)
-    user.pop("roles", None)
+    #collections = user["collections"]
+    #files = user["files"]
+    #roles = user["roles"]
+    #user.pop("collections", None)
+    #user.pop("files", None)
+    #user.pop("roles", None)
 
-    dbuser.collections = list(set(dbuser.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
-    dbuser.files  = list(set(dbuser.files + db.session.query(File).filter(File.id.in_(files)).all()))
-    dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
+    #dbuser.collections = list(set(dbuser.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
+    #dbuser.files  = list(set(dbuser.files + db.session.query(File).filter(File.id.in_(files)).all()))
+    #dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
 
     if "name" in user:
         dbuser.name = user["name"]
