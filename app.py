@@ -332,7 +332,7 @@ def download(fileid):
         user = dict(session).get('user', None)
         if dbutils.is_owner_file(user["id"], fileid) or dbutils.is_admin(user["id"]):
             db_file = dbutils.get_file(fileid)
-            print(db_file)
+            #print(db_file)
             response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
             return jsonify({"message": "URL signed", "url": response}), 200
         else:
@@ -727,32 +727,41 @@ def logout():
 
 @app.route('/api/user/authorize')
 def authorize():
-    print(request.url)
-    provider = request.args.get('provider')
-    if provider == "google":
-        google = oauth.create_client("google")
-        token = google.authorize_access_token()
-        response = google.get('userinfo', token=token)
-        print(response.content)
-    elif provider == "orcid":
-        orcid = oauth.create_client("orcid")
-        token = orcid.authorize_access_token()
-        print("token", token)
-        print("data",request.data)
-        orcid_id = request.args.get('orcid_id')
-        response = orcid.get(f'/v2.1/{orcid_id}/person', token=token)
-        #email = response.get("email")
-        #response = orcid.get('userinfo', token=token)
-        print(response.content)
-    user = dbutils.get_user(db, response)
-    user.admin = dbutils.is_admin(user.id)
-    session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-    if user.admin:
-        session["user"]["admin"] = user.admin
-    session.permanent = True
-    # do something with the token and profile
-    #return redirect('/')
-    return redirect(conf["redirect"]["url"]+'/myfiles')
+    try:
+        print(request.url)
+        provider = request.args.get('provider')
+        if provider == "google":
+            google = oauth.create_client("google")
+            token = google.authorize_access_token()
+            response = google.get('userinfo', token=token)
+            print(response.content)
+        elif provider == "orcid":
+            orcid = oauth.create_client("orcid")
+            token = orcid.authorize_access_token()
+            print("token")
+            print(token)
+            print("data")
+            print(request.data)
+            orcid_id = request.args.get('orcid_id')
+            response = orcid.get(f'/v2.1/{orcid_id}/person', token=token)
+            #email = response.get("email")
+            #response = orcid.get('userinfo', token=token)
+            print(response.content)
+        user = dbutils.get_user(db, response)
+        user.admin = dbutils.is_admin(user.id)
+        session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+        if user.admin:
+            session["user"]["admin"] = user.admin
+        session.permanent = True
+        # do something with the token and profile
+        #return redirect('/')
+        return redirect(conf["redirect"]["url"]+'/myfiles')
+    except Exception:
+        print("token")
+        print(token)
+        print("data")
+        print(request.data)
+        traceback.print_exc()
 
 @app.route('/api/user/i', methods = ['GET'])
 @accesskey_login
