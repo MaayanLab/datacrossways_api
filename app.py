@@ -707,6 +707,7 @@ def get_news():
 def login():
     google = oauth.create_client('google')  # create the google oauth client
     redirect_uri = url_for('authorize', provider="google", _external=True)
+    print(redirect_uri)
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/login/orcid')
@@ -714,7 +715,6 @@ def login_orcid():
     orcid = oauth.create_client('orcid')  # create the orcid oauth client
     #redirect_uri = url_for('authorize', provider="orcid", _external=True)
     redirect_uri = "https://lymecommons.org/api/user/authorize?provider=orcid"
-    print(redirect_uri)
     return orcid.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/logout')
@@ -737,6 +737,8 @@ def authorize():
     elif provider == "orcid":
         orcid = oauth.create_client("orcid")
         token = orcid.authorize_access_token()
+        print("token", token)
+        print("data",request.data)
         orcid_id = request.args.get('orcid_id')
         response = orcid.get(f'/v2.1/{orcid_id}/person', token=token)
         #email = response.get("email")
