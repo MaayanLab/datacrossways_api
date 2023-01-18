@@ -738,7 +738,10 @@ def authorize():
         elif provider == "orcid":
             orcid = oauth.create_client("orcid")
             token = orcid.authorize_access_token()
-            print("token")
+            user_name = token["name"]
+            first_name = token["name"].split(" ")[0]
+            last_name = token["name"].split(" ")[-1]
+            orcid_id = token["orcid"]
             print(token)
             print("data")
             print(request.data)
@@ -762,6 +765,7 @@ def authorize():
         print("data")
         print(request.data)
         traceback.print_exc()
+        return jsonify({"token": token})
 
 @app.route('/api/user/i', methods = ['GET'])
 @accesskey_login
