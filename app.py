@@ -727,6 +727,7 @@ def logout():
 
 @app.route('/api/user/authorize')
 def authorize():
+    print(request.url)
     provider = request.args.get('provider')
     if provider == "google":
         google = oauth.create_client("google")
