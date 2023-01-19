@@ -48,6 +48,7 @@ class User(db.Model):
         self.last_name = last_name
         self.email = email
         self.affiliation = affiliation
+        self.orcid_id = orcid_id
     
     def __repr__(self):
         return f"{self.id}-{self.name}-{self.email}-{self.uuid}"
