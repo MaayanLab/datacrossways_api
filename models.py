@@ -33,6 +33,7 @@ class User(db.Model):
     affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid, index=True)
+    orcid_id = db.Column(db.String(), unique=True)
     storage_quota = db.Column(db.Integer, default=100000)
 
     # relationships
@@ -41,7 +42,7 @@ class User(db.Model):
     roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
     keys = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
 
-    def __init__(self, name, first_name, last_name, email, affiliation=""):
+    def __init__(self, name, first_name, last_name, email, affiliation="", orcid_id=""):
         self.name = name
         self.first_name = first_name
         self.last_name = last_name

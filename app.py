@@ -727,45 +727,31 @@ def logout():
 
 @app.route('/api/user/authorize')
 def authorize():
-    try:
-        print(request.url)
-        provider = request.args.get('provider')
-        if provider == "google":
-            google = oauth.create_client("google")
-            token = google.authorize_access_token()
-            response = google.get('userinfo', token=token)
-            print(response.content)
-        elif provider == "orcid":
-            orcid = oauth.create_client("orcid")
-            token = orcid.authorize_access_token()
-            user_name = token["name"]
-            first_name = token["name"].split(" ")[0]
-            last_name = token["name"].split(" ")[-1]
-            orcid_id = token["orcid"]
-            print(token)
-            print("data")
-            print(request.data)
-            orcid_id = request.args.get('orcid_id')
-            response = orcid.get(f'/v2.1/{orcid_id}/person', token=token)
-            #email = response.get("email")
-            #response = orcid.get('userinfo', token=token)
-            print(response.content)
-        user = dbutils.get_user(db, response)
-        user.admin = dbutils.is_admin(user.id)
-        session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-        if user.admin:
-            session["user"]["admin"] = user.admin
-        session.permanent = True
-        # do something with the token and profile
-        #return redirect('/')
-        return redirect(conf["redirect"]["url"]+'/myfiles')
-    except Exception:
-        print("token")
-        print(token)
-        print("data")
-        print(request.data)
-        traceback.print_exc()
-        return jsonify({"token": token})
+    print(request.url)
+    provider = request.args.get('provider')
+    if provider == "google":
+        google = oauth.create_client("google")
+        token = google.authorize_access_token()
+        response = google.get('userinfo', token=token)
+        print(response.content)
+        user_info = response.json()
+    elif provider == "orcid":
+        orcid = oauth.create_client("orcid")
+        token = orcid.authorize_access_token()
+        user_name = token["name"]
+        first_name = token["name"].split(" ")[0]
+        last_name = token["name"].split(" ")[-1]
+        orcid_id = token["orcid"]
+        user_info = {"name": user_name, "first_name": first_name, "last_name": last_name, "orcid_id": orcid_id, "email": ""}
+    user = dbutils.get_user(db, user_info)
+    user.admin = dbutils.is_admin(user.id)
+    session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+    if user.admin:
+        session["user"]["admin"] = user.admin
+    session.permanent = True
+    # do something with the token and profile
+    #return redirect('/')
+    return redirect(conf["redirect"]["url"]+'/myfiles')
 
 @app.route('/api/user/i', methods = ['GET'])
 @accesskey_login
