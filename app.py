@@ -742,7 +742,7 @@ def authorize():
         first_name = token["name"].split(" ")[0]
         last_name = token["name"].split(" ")[-1]
         orcid_id = token["orcid"]
-        user_info = {"name": user_name, "first_name": first_name, "last_name": last_name, "orcid_id": orcid_id, "email": ""}
+        user_info = {"name": user_name, "first_name": first_name, "last_name": last_name, "orcid_id": orcid_id, "email": None}
     user = dbutils.get_user(db, user_info)
     user.admin = dbutils.is_admin(user.id)
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}

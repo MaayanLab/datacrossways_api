@@ -29,7 +29,7 @@ class User(db.Model):
     name = db.Column(db.String())
     first_name = db.Column(db.String())
     last_name = db.Column(db.String())
-    email = db.Column(db.String(), unique=True)
+    email = db.Column(db.String(), unique=True, nullable=True)
     affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid, index=True)
