@@ -63,17 +63,26 @@ def get_user_by_id(id):
         user = db_user
     return user
 
-def get_user(db, response):
-    user_info = response.json()
+def get_user(db, user_info):
     user = ""
-    db_user = db.session.query(User).filter(User.email == user_info["email"]).first()
-    if db_user:
-        user = db_user
+    if user_info["orcid_id"] != "":
+        db_user = db.session.query(User).filter(User.email == user_info["orcid_id"]).first()
+        if db_user:
+            user = db_user
+        else:
+            db_user = User(user_info["name"], user_info["given_name"], user_info["family_name"], user_info["email"], orcid_id=user_info["orcid_id"])
+            db.session.add(db_user)
+            db.session.commit()
+            user = db.session.query(User).filter(User.orcid_id == user_info["orcid_id"]).first()
     else:
-        db_user = User(user_info["name"], user_info["given_name"], user_info["family_name"], user_info["email"])
-        db.session.add(db_user)
-        db.session.commit()
-        user = db.session.query(User).filter(User.email == user_info["email"]).first()
+        db_user = db.session.query(User).filter(User.email == user_info["email"]).first()
+        if db_user:
+            user = db_user
+        else:
+            db_user = User(user_info["name"], user_info["given_name"], user_info["family_name"], user_info["email"])
+            db.session.add(db_user)
+            db.session.commit()
+            user = db.session.query(User).filter(User.email == user_info["email"]).first()
     return user
 
 def create_user(user_info):
@@ -310,7 +319,7 @@ def search_files(data, user_id, collection_id, offset=0, limit=20):
             f = dict(file.__dict__)
             f.pop('_sa_instance_state', None)
             res_files.append(f)
-    print(len(res_files))
+    #print(len(res_files))
     print(time.time()-tt)
     res_files_page = res_files[offset:(offset+limit)]
 
@@ -319,7 +328,7 @@ def search_files(data, user_id, collection_id, offset=0, limit=20):
 def add_file_detail(files):
     for file in files:
         file_details = db.session.query(File, User, Collection).filter(File.id == file["id"]).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).all()[0]
-        print(file_details)
+        #print(file_details)
         owner = {"id": file_details[1].id, "first_name": file_details[1].first_name, "last_name": file_details[1].last_name}
         collection = {"id": file_details[2].id, "name": file_details[2].name}
         file["owner"] = owner
@@ -337,7 +346,7 @@ def get_user_roles(userid):
     roles = []
     for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
         roles.append({"id": r.id, "name": r.name})
-    print(roles)
+    #print(roles)
     return roles
 
 def print_user(user):
