@@ -70,7 +70,7 @@ def get_user(db, user_info):
         if db_user:
             user = db_user
         else:
-            db_user = User(user_info["name"], user_info["given_name"], user_info["family_name"], user_info["email"], orcid_id=user_info["orcid_id"])
+            db_user = User(user_info["name"], user_info["first_name"], user_info["last_name"], user_info["email"], orcid_id=user_info["orcid_id"])
             db.session.add(db_user)
             db.session.commit()
             user = db.session.query(User).filter(User.orcid_id == user_info["orcid_id"]).first()
