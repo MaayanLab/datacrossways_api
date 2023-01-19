@@ -213,11 +213,12 @@ def search_file():
         data = request.get_json()
         offset = int(data.get("offset", 0))
         limit = int(data.get("limit", 20))
+        fileinfo = data.get("file_info", None)
         collection_id = data.get("collection_id", None)
         collection_id = int(collection_id) if collection_id else None
         import time
         tt = time.time()
-        files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, offset, limit)
+        files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, fileinfo, offset, limit)
         print("all:", time.time()-tt)
         return jsonify({"message": "files searched successfully", "files": files, "total": file_count})
     except Exception:

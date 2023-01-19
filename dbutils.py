@@ -295,16 +295,24 @@ def list_user_files(user_id, offset, limit):
 def list_collection_files(user_id):
     return []
 
-def search_files(data, user_id, collection_id, offset=0, limit=20):
+def search_files(data, user_id, collection_id, file_name, offset=0, limit=20):
     tt = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     print(time.time()-tt)
     tt = time.time()
+
+    files = db.session.query(File)
     if collection_id is not None:
-        files = filterjson(db.session.query(File).filter(File.collection_id == collection_id), File.meta, data).all()
+        files = files.filter(File.collection_id == collection_id)
     else:
         #files = filterjson(db.session.query(File), File.meta, data).all()
         files = filterjson(db.session.query(File), File.meta, data).filter(or_(File.visibility == "visible", File.uuid.in_(set(list_creds))))
+    
+    if file_name is not None:
+        files = files.filter(or_(File.display_name.like("%{}%".format(file_name)), File.description.like("%{}%".format(file_name))))
+    
+    files = filterjson(files, File.meta, data).filter(or_(File.visibility == "visible", File.uuid.in_(set(list_creds))))
+
     print(time.time()-tt)
     
     res_files = []
