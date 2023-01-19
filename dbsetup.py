@@ -9,19 +9,22 @@ user_1 = User(name='Alexander Lachmann',
                 first_name="Alexander", 
                 last_name="Lachmann",
                 affiliation="Mount Sinai Hospital",
-                email="alexander.lachmann@gmail.com")
+                email="alexander.lachmann@gmail.com",
+                orcid_id="0000-0002-1982-7652")
 
 user_2 = User(name='Avi Ma\'ayan', 
                 first_name="Avi", 
                 last_name="Ma\'ayan",
                 affiliation="Mount Sinai Hospital",
-                email="avi.maayan@mssm.edu")
+                email="avi.maayan@mssm.edu",
+                orcid_id="0000-0002-1982-7653")
 
 user_3 = User(name='Daniel Clarke', 
                 first_name="Daniel", 
                 last_name="Clarke",
                 affiliation="Mount Sinai Hospital",
-                email="u8sand@sand.com")
+                email="u8sand@sand.com",
+                orcid_id="0000-0002-1982-7654")
 
 root_collection = Collection(name="root", user=user_1)
 
