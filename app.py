@@ -737,7 +737,7 @@ def logout():
 def authorize():
     print(request.url)
     provider = request.args.get('provider')
-    redirect_endpoint = session['redirect_endpoint'].get('state', None)
+    redirect_endpoint = session.get('redirect_endpoint', None)
     if provider == "google":
         google = oauth.create_client("google")
         token = google.authorize_access_token()
