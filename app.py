@@ -707,8 +707,9 @@ def get_news():
 @app.route('/api/user/login/google')
 def login():
     google = oauth.create_client('google')  # create the google oauth client
-    redirect_uri = url_for('authorize', provider="google", _external=True)
-    print(redirect_uri)
+    #redirect_uri = url_for('authorize', provider="google", _external=True)
+    #print(redirect_uri)
+    redirect_uri = "https://lymecommons.org/api/user/authorize?provider=google"
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/login/orcid')
