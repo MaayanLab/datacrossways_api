@@ -706,17 +706,23 @@ def get_news():
 # ------------------ Login/Logout ----------------
 @app.route('/api/user/login/google')
 def login():
+    redirect_endpoint = request.args.get('redirect_endpoint', None)
     google = oauth.create_client('google')  # create the google oauth client
     #redirect_uri = url_for('authorize', provider="google", _external=True)
     #print(redirect_uri)
     redirect_uri = "https://lymecommons.org/api/user/authorize?provider=google"
+    if redirect_endpoint != None:
+        redirect_uri = f'{redirect_uri}&redirect_endpoint={redirect_endpoint}'
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/login/orcid')
 def login_orcid():
+    redirect_endpoint = request.args.get('redirect_endpoint', None)
     orcid = oauth.create_client('orcid')  # create the orcid oauth client
     #redirect_uri = url_for('authorize', provider="orcid", _external=True)
     redirect_uri = "https://lymecommons.org/api/user/authorize?provider=orcid"
+    if redirect_endpoint != None:
+        redirect_uri = f'{redirect_uri}&redirect_endpoint={redirect_endpoint}'
     return orcid.authorize_redirect(redirect_uri)
 
 @app.route('/api/user/logout')
@@ -731,11 +737,11 @@ def logout():
 def authorize():
     print(request.url)
     provider = request.args.get('provider')
+    redirect_endpoint = request.args.get('redirect_endpoint')
     if provider == "google":
         google = oauth.create_client("google")
         token = google.authorize_access_token()
         response = google.get('userinfo', token=token)
-        print(response.content)
         user_info = response.json()
     elif provider == "orcid":
         orcid = oauth.create_client("orcid")
@@ -753,7 +759,9 @@ def authorize():
     session.permanent = True
     # do something with the token and profile
     #return redirect('/')
-    return redirect(conf["redirect"]["url"]+'/myfiles')
+    if redirect_endpoint != None:
+        redirect(conf["redirect"]["url"]+'/'+redirect_endpoint)
+    return redirect(conf["redirect"]["url"]+'/search')
 
 @app.route('/api/user/i', methods = ['GET'])
 @accesskey_login
