@@ -713,7 +713,7 @@ def login():
     redirect_uri = "https://lymecommons.org/api/user/authorize?provider=google"
     if redirect_endpoint != None:
         redirect_uri = f'{redirect_uri}&redirect_endpoint={redirect_endpoint}'
-    return google.authorize_redirect(redirect_uri)
+    return google.authorize_redirect(redirect_uri, state="mystate")
 
 @app.route('/api/user/login/orcid')
 def login_orcid():
