@@ -65,7 +65,7 @@ def get_user_by_id(id):
 
 def get_user(db, user_info):
     user = ""
-    if user_info["orcid_id"] != "":
+    if user_info.get("orcid_id") != None:
         db_user = db.session.query(User).filter(User.orcid_id == user_info["orcid_id"]).first()
         if db_user:
             user = db_user
