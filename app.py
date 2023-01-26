@@ -769,10 +769,9 @@ def authorize():
 @login_required
 def mycred():
     try:
-        return jsonify(session["user"]), 200
+        return dbutils.get_user_by_id_json(session["user"]["id"]), 200
     except Exception:
         return jsonify(message="An error occurred when updating user"), 500
-
 
 @app.route('/api/user/<int:user_id>', methods = ['GET'])
 @accesskey_login
