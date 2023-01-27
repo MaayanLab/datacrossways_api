@@ -94,7 +94,7 @@ def create_user(user_info):
         #user_info.pop("files", None)
         #user_info.pop("roles", None)
         user = User(**user_info)
-
+        user.orcid_id = None
         #user.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
         #user.files  = db.session.query(File).filter(File.id.in_(files)).all()
         #user.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
