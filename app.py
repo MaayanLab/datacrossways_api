@@ -159,7 +159,6 @@ def patch_user():
 @admin_required
 @app.route('/api/user/<int:user_id>', methods = ["DELETE"])
 def delete_user(user_id):
-    user = request.get_json()
     try:
         user = dbutils.delete_user(user_id)
         return jsonify({"message": "user deleted successfully", "user": user}), 203
