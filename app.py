@@ -125,6 +125,20 @@ def get_user_files():
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
 
+@app.route('/api/user/collection', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+def get_user_collections():
+    try:
+        offset = request.args.get("offset", default=0)
+        limit = request.args.get("limit", default=1000)
+        files, file_count = dbutils.list_user_collections(session["user"]["id"], offset, limit)
+        return jsonify({"message": "files listed successfully", "collections": files, "offset": offset, "limit": limit, "total": file_count}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing collections"), 500
+
 @app.route('/api/user', methods = ["POST"])
 @accesskey_login
 @dev_login

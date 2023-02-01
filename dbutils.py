@@ -292,6 +292,14 @@ def list_user_files(user_id, offset, limit):
         files.append(file_result)
     return files, file_count
 
+def list_user_collections(user_id, offset, limit):
+    collection_count = db.session.query(Collection).filter(Collection.owner_id == user_id).count()
+    db_collections = db.session.query(Collection).filter(Collection.owner_id == user_id).order_by(Collection.id).offset(offset).limit(limit).all()
+    collections = []
+    for collection in db_collections:
+        collections.append(print_collection(collection))
+    return collections, collection_count
+
 def list_collection_files(user_id):
     return []
 
