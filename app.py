@@ -125,6 +125,18 @@ def get_user_files():
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
 
+@app.route('/api/user/storage', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+def get_user_storage():
+    try:
+        file_quota_used, file_quota_available, file_quota = dbutils.list_user_quota(session["user"]["id"])
+        return jsonify({"file_quota_used": file_quota_used, "file_quota": file_quota, "file_quota_available": file_quota_available, "info": "quota in MB"}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing file quota"), 500
+
 @app.route('/api/user/collection', methods = ["GET"])
 @accesskey_login
 @dev_login
@@ -227,11 +239,12 @@ def search_file():
         offset = int(data.get("offset", 0))
         limit = int(data.get("limit", 20))
         fileinfo = data.get("file_info", None)
+        owner_id = data.get("owner_id", None)
         collection_id = data.get("collection_id", None)
         collection_id = int(collection_id) if collection_id else None
         import time
         tt = time.time()
-        files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, fileinfo, offset, limit)
+        files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, fileinfo, owner_id, offset, limit)
         print("all:", time.time()-tt)
         return jsonify({"message": "files searched successfully", "files": files, "total": file_count})
     except Exception:
@@ -590,6 +603,24 @@ def get_collection_id(collection_id):
         return jsonify(collection)
     except Exception:
         traceback.print_exc()
+
+
+@app.route('/api/collection/<int_list:collection_ids>', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_collections_list(collection_ids):
+    try:
+        collections = []
+        user = dict(session).get('user', None)
+        for collection_id in collection_ids:
+            collection = dbutils.get_collection(collection_id, user["id"])
+            collections.append(collection)
+        return jsonify(collections=collections), 200
+    except Exception:
+        return jsonify(message="An error occurred when retrieving collections"), 500
+
 
 @app.route('/api/collection/<int:collection_id>/files', methods = ["GET"])
 @accesskey_login

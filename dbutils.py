@@ -113,6 +113,15 @@ def delete_user(user_id):
     db.session.commit()
     return(r)
 
+def list_user_quota(user_id):
+    db_user = db.session.query(User).filter(User.id == user_id).first()
+    db_files = db.session.query(File).filter(File.owner_id == user_id).all()
+    quota_used = 0
+    for file in db_files:
+        quota_used = quota_used+file.size
+    quota_used = quota_used/(1024*1024)
+    return((int(quota_used), int(max(0, db_user.storage_quota - quota_used)), int(db_user.storage_quota)))
+
 def update_user(user):
     dbuser = db.session.query(User).filter(User.id == user["id"]).first()
     user.pop("creation_date", None)
@@ -303,7 +312,7 @@ def list_user_collections(user_id, offset, limit):
 def list_collection_files(user_id):
     return []
 
-def search_files(data, user_id, collection_id, file_name, offset=0, limit=20):
+def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
     tt = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     print(time.time()-tt)
@@ -318,6 +327,9 @@ def search_files(data, user_id, collection_id, file_name, offset=0, limit=20):
     
     if file_name is not None:
         files = files.filter(or_(File.display_name.like("%{}%".format(file_name)), File.description.like("%{}%".format(file_name))))
+    
+    if owner_id is not None:
+        files = files.filter(File.owner_id == owner_id)
     
     files = filterjson(files, File.meta, data).filter(or_(File.visibility == "visible", File.uuid.in_(set(list_creds))))
 
