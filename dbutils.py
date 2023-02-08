@@ -246,7 +246,7 @@ def print_policy(policy):
 
 def create_file(db, file_name, file_size, user_id):
     user = db.session.query(User).filter(User.id == user_id).first()
-    file = File(name=file_name, user=user, size=file_size)
+    file = File(name=file_name, user=user, size=file_size, collection_id=1)
     db.session.add_all([file])
     db.session.commit()
     db.session.refresh(file)
@@ -766,8 +766,8 @@ def get_file_metadata(db, file_id, user_id):
     return file.meta
 
 def get_file_by_id(file_id, user_id):
-    file = File.query.filter(File.id == file_id).first()
-    file = db.session.query(File, User, Collection).filter(File.id == file_id).filter(File.collection_id == Collection.id).first()
+    #file = File.query.filter(File.id == file_id).first()
+    file = db.session.query(File, User, Collection).filter(File.id == file_id).filter(User.id == File.owner_id).filter(Collection.id == File.collection_id).first()
     owner = file[1]
     collection = file[2]
     owner_result = {"first_name": owner.first_name, "last_name": owner.last_name, "id": owner.id, "uuid": owner.uuid}

@@ -75,7 +75,7 @@ class File(db.Model):
     creation_date = db.Column(db.DateTime, default=datetime.now)
     size = db.Column(db.Integer(), default=0)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
-    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'), index=True)
+    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'), index=True, default=1)
 
     meta = db.Column(mutable_json_type(dbtype=JSONB, nested=True), index=True)
     

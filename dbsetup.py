@@ -26,6 +26,7 @@ user_3 = User(name='Daniel Clarke',
                 email="u8sand@sand.com",
                 orcid_id="0000-0002-1982-7654")
 
+# needs to be created as a default for files if collection is not specified
 root_collection = Collection(name="root", user=user_1)
 
 file_1 = File(name="file_1.txt", user=user_1, collection=root_collection)
