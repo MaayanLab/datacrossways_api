@@ -7,15 +7,12 @@ def delete_file(file_uuid, file_name):
     print(file_name)
     s3_client = get_aws_client(app.conf["aws"])
     s3_client.delete_objects(
-        Bucket='mssm-test',
+        Bucket=app.conf["aws"]["bucket"],
         Delete={
             'Objects': [
                 {
                     'Key': file_uuid+"/"+file_name
-                },
-                {
-                    'Key': '8NbxBTgtowEu'
-                },
+                }
             ],
             'Quiet': True
         }
@@ -58,13 +55,13 @@ def sign_upload_file(file_name, cred):
 
 def start_multipart(filename, cred):
     s3_client = get_aws_client(cred)
-    return s3_client.create_multipart_upload(Bucket=cred["bucket_name"], Key=filename)['UploadId']
+    return s3_client.create_multipart_upload(Bucket=cred["bucket"], Key=filename)['UploadId']
 
 def sign_multipart(filename, upload_id, part_number, cred):
     s3_client = get_aws_client(cred)
     signed_url = s3_client.generate_presigned_url(
         ClientMethod='upload_part',
-        Params={'Bucket': cred['bucket_name'], 
+        Params={'Bucket': cred['bucket'], 
         'Key': filename, 
         'UploadId': upload_id, 
         'PartNumber': part_number})

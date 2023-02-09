@@ -432,7 +432,8 @@ def startmultipart():
         response = s3utils.start_multipart(db_file["uuid"]+"/"+data["filename"], conf["aws"])
         res = {'status': 'ok', 'upload_id': response, 'uuid': db_file["uuid"]}
         return jsonify({"message": "multipart upload started", 'upload_id': response, 'uuid': db_file["uuid"]}), 200
-    except Exception: 
+    except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when attempting to start multipart upload"), 500
 
 @app.route('/api/file/signmultipart', methods = ['POST'])
