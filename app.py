@@ -460,6 +460,7 @@ def completemultipart():
         s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
         return jsonify({'message': 'multipart upload completed'}), 200 
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when attempting to complete multipart upload"), 500
 
 # ------------------- end file -------------------
