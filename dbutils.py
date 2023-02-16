@@ -517,7 +517,7 @@ def get_collection(collection_id, user_id):
     owner = {"id": db_owner.id, "name": db_owner.name, "firstname": db_owner.first_name, "lastname": db_owner.last_name, "affiliation": db_owner.affiliation}
     sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
     sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
-    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "owner": owner, "image_url": collection.image_url, "collections": len(sub_collections), "files": len(sub_files)}
+    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "owner": owner, "image_url": collection.image_url, "collections": len(sub_collections), "files": len(sub_files), "accessibility": collection.accessibility, "visibility": collection.visibility}
     # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     
     # for sc in sub_collections:
@@ -708,7 +708,8 @@ def filterjson(filter, file, j):
     return filter
 
 def annotate_file(file_id, metadata):
-    file = File.query.filter(File.id == file_id).first().meta = metadata
+    file = File.query.filter(File.id == file_id).first()
+    file.meta = metadata
     db.session.commit()
     db.session.refresh(file)
     file = dict(file.__dict__)
