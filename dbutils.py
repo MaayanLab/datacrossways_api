@@ -460,6 +460,7 @@ def create_collection(collection, user_id):
     collection.pop("uuid", None)
     collection["owner_id"] = user_id
     dbcollection = Collection(**collection)
+    db.session.add_all([dbcollection])
     #dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(cols)).all()
     #dbcollection.files  = db.session.query(File).filter(File.id.in_(files)).all()
     db.session.commit()
