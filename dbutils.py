@@ -451,14 +451,16 @@ def list_collections():
         collections.append(print_collection(collection))
     return collections
 
-def create_collection(collection):
-    files = collection["files"]
-    cols = collection["collections"]
-    collection.pop("collections", None)
-    collection.pop("files", None)
+def create_collection(collection, user_id):
+    #files = collection["files"]
+    #cols = collection["collections"]
+    #collection.pop("collections", None)
+    collection.pop("id", None)
+    collection.pop("uuid", None)
+    collection.owner_id = user_id
     dbcollection = Collection(**collection)
-    dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(cols)).all()
-    dbcollection.files  = db.session.query(File).filter(File.id.in_(files)).all()
+    #dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(cols)).all()
+    #dbcollection.files  = db.session.query(File).filter(File.id.in_(files)).all()
     db.session.commit()
     db.session.refresh(dbcollection)
     return(print_collection(dbcollection))

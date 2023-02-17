@@ -644,8 +644,9 @@ def get_collection_files(collection_id):
 @login_required
 def post_collection():
     try:
+        user = dict(session).get('user', None)
         data = request.get_json()
-        collection = dbutils.create_collection(data)
+        collection = dbutils.create_collection(data, user["id"])
         return jsonify({"message": "collections created successfully", "collection": collection})
     except Exception:
         traceback.print_exc()
