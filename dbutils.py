@@ -458,7 +458,7 @@ def create_collection(collection, user_id):
     collection.pop("files", None)
     collection.pop("id", None)
     collection.pop("uuid", None)
-    collection.owner_id = user_id
+    collection["owner_id"] = user_id
     dbcollection = Collection(**collection)
     #dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(cols)).all()
     #dbcollection.files  = db.session.query(File).filter(File.id.in_(files)).all()
