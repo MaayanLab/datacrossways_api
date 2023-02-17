@@ -454,7 +454,8 @@ def list_collections():
 def create_collection(collection, user_id):
     #files = collection["files"]
     #cols = collection["collections"]
-    #collection.pop("collections", None)
+    collection.pop("collections", None)
+    collection.pop("files", None)
     collection.pop("id", None)
     collection.pop("uuid", None)
     collection.owner_id = user_id
