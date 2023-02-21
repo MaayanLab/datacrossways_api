@@ -521,15 +521,14 @@ def get_collection(collection_id, user_id):
     owner = {"id": db_owner.id, "name": db_owner.name, "firstname": db_owner.first_name, "lastname": db_owner.last_name, "affiliation": db_owner.affiliation}
     sub_collections = Collection.query.filter(Collection.parent_collection_id==collection_id).order_by(Collection.id).all()
     sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
-    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "owner": owner, "image_url": collection.image_url, "collections": len(sub_collections), "files": len(sub_files), "accessibility": collection.accessibility, "visibility": collection.visibility}
+    collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "owner": owner, "image_url": collection.image_url, "collections": len(sub_collections), "child_collections": [], "files": len(sub_files), "accessibility": collection.accessibility, "visibility": collection.visibility}
     # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     
-    # for sc in sub_collections:
-    #     if sc.uuid in list_creds or sc.visibility == "visible":
-    #         num_collections = Collection.query.filter(Collection.parent_collection_id==sc.id).count()
-    #         num_files = File.query.filter(File.collection_id==sc.id).count()
-    #         temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid, "parent_collection_id": sc.parent_collection_id, "date": sc.creation_date, "owner_id": sc.owner_id, "child_collections": num_collections, "child_files": num_files}
-    #         collection_return["child_collections"].append(temp_collection)
+    for sc in sub_collections:
+        if sc.uuid in list_creds or sc.visibility == "visible":
+            temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid}
+            collection_return["child_collections"].append(temp_collection)
+    
     # for file in sub_files:
     #     if file.uuid in list_creds or file.visibility == "visible":
     #         permissions = ["list"]
