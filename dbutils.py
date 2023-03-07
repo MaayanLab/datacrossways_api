@@ -323,7 +323,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
         files = files.filter(File.collection_id == collection_id)
     else:
         #files = filterjson(db.session.query(File), File.meta, data).all()
-        files = filterjson(db.session.query(File), File.meta, data).filter(or_(File.visibility == "visible", File.uuid.in_(set(list_creds))))
+        files = filterjson(db.session.query(File), File.meta, data).filter(File.visibility == "visible")
     
     if file_name is not None:
         files = files.filter(or_(File.display_name.like("%{}%".format(file_name)), File.description.like("%{}%".format(file_name))))
@@ -331,14 +331,14 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if owner_id is not None:
         files = files.filter(File.owner_id == owner_id)
     
-    files = filterjson(files, File.meta, data).filter(or_(File.visibility == "visible", File.uuid.in_(set(list_creds))))
+    files = filterjson(files, File.meta, data).filter(File.visibility == "visible" d)
 
     print(time.time()-tt)
     
     res_files = []
     tt = time.time()
     for file in files:
-        if file.uuid in list_creds or file.visibility == "visible":
+        if file.uuid in list_creds or file.visibility == "visible" or is_admin(user_id):
             permissions = ["list"]
             if file.uuid in read_creds:
                 permissions.append("read")
@@ -407,6 +407,12 @@ def print_collection(collection):
     return(collection)
 
 def get_scope(userid):
+    read_cred = []
+    write_cred = []
+    list_cred = []
+    return (set(list_cred), set(read_cred), set(write_cred))
+
+def get_scope2(userid):
     read_cred = []
     write_cred = []
     list_cred = []
@@ -525,7 +531,7 @@ def get_collection(collection_id, user_id):
     # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     
     for sc in sub_collections:
-        if sc.uuid in list_creds or sc.visibility == "visible":
+        if sc.uuid in list_creds or sc.visibility == "visible" or True:
             temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid}
             collection_return["child_collections"].append(temp_collection)
     
@@ -551,7 +557,7 @@ def get_collection_files(collection_id, offset, limit, user_id):
         files = []
         sub_files = File.query.filter(File.collection_id==collection_id).order_by(File.id).all()
         for file in sub_files:
-            if file.uuid in list_creds or file.visibility == "visible":
+            if file.uuid in list_creds or file.visibility == "visible" or is_admin(user_id):
                 permissions = ["list"]
                 if file.uuid in read_creds:
                     permissions.append("read")
