@@ -331,7 +331,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if owner_id is not None:
         files = files.filter(File.owner_id == owner_id)
     
-    files = filterjson(files, File.meta, data).filter(File.visibility == "visible" d)
+    files = filterjson(files, File.meta, data).filter(File.visibility == "visible")
 
     print(time.time()-tt)
     
