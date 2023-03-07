@@ -323,7 +323,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
         files = files.filter(File.collection_id == collection_id)
     else:
         #files = filterjson(db.session.query(File), File.meta, data).all()
-        files = filterjson(db.session.query(File), File.meta, data).filter(File.visibility == "visible")
+        files = filterjson(db.session.query(File), File.meta, data)
     
     if file_name is not None:
         files = files.filter(or_(File.display_name.like("%{}%".format(file_name)), File.description.like("%{}%".format(file_name))))
@@ -331,7 +331,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if owner_id is not None:
         files = files.filter(File.owner_id == owner_id)
     
-    files = filterjson(files, File.meta, data).filter(File.visibility == "visible")
+    files = filterjson(files, File.meta, data)
 
     print(time.time()-tt)
     
