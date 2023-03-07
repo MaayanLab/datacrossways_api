@@ -560,7 +560,7 @@ def get_collection_files(collection_id, offset, limit, user_id):
                 temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
                 files.append(temp_file)
         offset = max(offset, 0)
-        limit = min(limit, len(files)-1)
+        limit = min(limit, len(files))
         return {"files": files[offset:(offset+limit)], "total_files": len(files)}
     else:
         return []

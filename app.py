@@ -54,11 +54,14 @@ cache = Cache(app, config={"CACHE_TYPE": "simple"})
 conf = read_config()
 
 app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
+app.config['SQLALCHEMY_POOL_SIZE'] = 40
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
-#migrate = Migrate(app, db)
 app.app_context().push()
+
+pool_size = db.engine.pool.size()
+print(f"Current pool size: {pool_size}")
 
 #oauth config
 oauth = OAuth(app)

@@ -214,8 +214,6 @@ db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filte
 
 db.session.query(User).filter(User.id == userid).join(UserRole, User.id == UserRole.user_id).all()
 
-
-
 from app import db, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 
 userid = 3
@@ -431,3 +429,73 @@ key = "JgCfuwQ68bQZZrnGaj3uHCsEcXNdBzpV"
 
 r = requests.get('http://localhost:5000/api/file/filter', headers={"x-api-key": key})
 r.json()
+
+
+import requests
+
+key = "JgCfuwQ68bQZZrnGaj3uHCsEcXNdBzpV"
+
+r = requests.get('http://localhost:5000/api/file', headers={"x-api-key": key})
+rr = r.json()
+
+
+import requests
+
+key = "JgCfuwQ68bQZZrnGaj3uHCsEcXNdBzpV"
+
+r = requests.get('http://localhost:5000/api/file?from=5&limit=15', headers={"x-api-key": key})
+rr = r.json()
+print(rr["files"][0])
+print(len(rr["files"]))
+
+
+r = requests.get('http://localhost:5000/api/file?from=10000000', headers={"x-api-key": key})
+rr = r.json()
+print(rr["files"][0])
+print(len(rr["files"]))
+
+
+query = {
+    "from": 0,
+    "limit": 2,
+    "query":{
+        "creator": {
+            "name": "c%"
+        },
+        "id": None
+    }
+}
+
+import time
+
+tt = time.time()
+r = requests.post('http://localhost:5000/api/file/search', json=query, headers={"x-api-key": key})
+rr = r.json()
+print(rr["files"][0])
+print(len(rr["files"]))
+time.time()-tt
+
+
+from app import db, User, File, Collection, Role, UserRole
+db.session.query(File, User.name).filter(File.owner_id == User.id).first()
+
+import time
+
+st = time.time()
+res = db.session.query(File, User.name).join(File, File.owner_id == User.id).all()
+print(time.time()-st)
+
+
+st = time.time()
+res2 = db.session.query(File, User.name).filter(File.owner_id == User.id).all()
+print(time.time()-st)
+
+for col in User.__table__.columns:
+   print(col)
+   print(col.index) # True if this field has index, None otherwise
+   print(col.primary_key) # True if is primary key, False otherwise
+
+
+
+from app import db, User, File, Collection, Role, UserRole
+db.session.query(File).filter(File.uuid.in_(("rDaPcPSkw4jn","6gNmimhPMga9", "6gNmimhPMga9"))).all()
