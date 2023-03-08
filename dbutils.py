@@ -458,33 +458,34 @@ def list_collections():
     return collections
 
 def create_collection(collection, user_id):
-    #files = collection["files"]
-    #cols = collection["collections"]
     collection.pop("collections", None)
     collection.pop("files", None)
     collection.pop("id", None)
     collection.pop("uuid", None)
     collection["owner_id"] = user_id
+    if "parent_collection_id" in collection:
+        if not db.session.query(Collection).filter(Collection.id == collection["parent_collection_id"]).first():
+            raise Exception("Invalid parent, collection does not exist")
     dbcollection = Collection(**collection)
     db.session.add_all([dbcollection])
-    #dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(cols)).all()
-    #dbcollection.files  = db.session.query(File).filter(File.id.in_(files)).all()
     db.session.commit()
     db.session.refresh(dbcollection)
     return(print_collection(dbcollection))
-
 
 def update_collection(collection):
     dbcollection = db.session.query(Collection).filter(Collection.id == collection["id"]).first()
     collection.pop("creation_date", None)
     collection.pop("uuid", None)
     collection.pop("id", None)
-
     collections = collection["collections"]
+    parent_path = get_parent_collection_path(dbcollection.id)
+    for cid in collections:
+        if cid in [x.id for x in parent_path]:
+            raise Exception("Invalid child, child collection is also parent (circular collection path).")
     files = collection["files"]
     collection.pop("collections", None)
     collection.pop("files", None)
-
+    
     dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
     dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
 
@@ -531,7 +532,7 @@ def get_collection(collection_id, user_id):
     # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     
     for sc in sub_collections:
-        if sc.uuid in list_creds or sc.visibility == "visible" or True:
+        if sc.uuid in list_creds or sc.visibility == "visible" or is_admin(user_id):
             temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid}
             collection_return["child_collections"].append(temp_collection)
     
@@ -576,8 +577,9 @@ def get_parent_collection_path(collection_id):
     collection = Collection.query.filter(Collection.id==collection_id).first()
     collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
     while collection.parent_collection_id:
-        collection = Collection.query.filter(Collection.id==collection.parent_collection_id).first()
-        collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
+        if len(collection_path) < 30:
+            collection = Collection.query.filter(Collection.id==collection.parent_collection_id).first()
+            collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
     return collection_path
 
 def update_file(db, file, updater_id):
