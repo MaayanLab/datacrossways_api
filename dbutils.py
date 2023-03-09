@@ -466,6 +466,8 @@ def create_collection(collection, user_id):
     if "parent_collection_id" in collection:
         if not db.session.query(Collection).filter(Collection.id == collection["parent_collection_id"]).first():
             raise Exception("Invalid parent, collection does not exist")
+    else:
+        collection["parent_collection_id"] = 1
     dbcollection = Collection(**collection)
     db.session.add_all([dbcollection])
     db.session.commit()
@@ -477,17 +479,26 @@ def update_collection(collection):
     collection.pop("creation_date", None)
     collection.pop("uuid", None)
     collection.pop("id", None)
-    collections = collection["collections"]
+    collections = collection.pop("collections", [])
     parent_path = get_parent_collection_path(dbcollection.id)
     for cid in collections:
         if cid in [x.id for x in parent_path]:
             raise Exception("Invalid child, child collection is also parent (circular collection path).")
-    files = collection["files"]
-    collection.pop("collections", None)
-    collection.pop("files", None)
-    
-    dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
-    dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
+    files = collection.pop("files", [])
+    overwrite = collection.pop("overwrite", False)
+    print(files)
+    if overwrite:
+        for c in dbcollection.collections:
+            if c.id not in collections:
+                c.parent_collection_id = 1
+        for f in dbcollection.files:
+            if f.id not in files:
+                f.collection_id = 1
+        dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
+        dbcollection.files = db.session.query(File).filter(File.id.in_(files)).all()
+    else:
+        dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
+        dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
 
     if "name" in collection:
         dbcollection.name = collection["name"]
