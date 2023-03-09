@@ -482,7 +482,7 @@ def update_collection(collection):
     collections = collection.pop("collections", [])
     parent_path = get_parent_collection_path(dbcollection.id)
     for cid in collections:
-        if cid in [x.id for x in parent_path]:
+        if cid in [x["id"] for x in parent_path]:
             raise Exception("Invalid child, child collection is also parent (circular collection path).")
     files = collection.pop("files", [])
     overwrite = collection.pop("overwrite", False)
