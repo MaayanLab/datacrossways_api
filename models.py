@@ -26,9 +26,9 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key = True)
-    name = db.Column(db.String())
-    first_name = db.Column(db.String())
-    last_name = db.Column(db.String())
+    name = db.Column(db.String(), index=True)
+    first_name = db.Column(db.String(), index=True)
+    last_name = db.Column(db.String(), index=True)
     email = db.Column(db.String(), unique=True, nullable=True)
     affiliation = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
@@ -135,7 +135,8 @@ class Accesskey(db.Model):
 class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer(), primary_key=True)
-    name = db.Column(db.String(200), unique=True)
+    name = db.Column(db.String(200), unique=True, index=True)
+    description = db.Column(db.String(2000))
     policies = db.relationship('Policy', secondary='role_policy', cascade='all, delete')
     def __repr__(self):
         return f"{self.id}-{self.name}"
@@ -171,6 +172,8 @@ class RolePolicy(db.Model):
 class Policy(db.Model):
     __tablename__ = 'policies'
     id = db.Column(db.Integer(), primary_key=True)
+    name = db.Column(db.String(200), unique=True)
+    description = db.Column(db.String(2000))
 
     # should be usually allow, but could be Deny
     effect = db.Column(db.String(10), index=True)

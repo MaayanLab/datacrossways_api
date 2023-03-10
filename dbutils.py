@@ -85,6 +85,28 @@ def get_user(db, user_info):
             user = db.session.query(User).filter(User.email == user_info["email"]).first()
     return user
 
+def create_users_bulk(user_info):
+    user_failed = []
+    user_success = []
+    for u in user_info:
+        if db.session.query(User).filter(User.email == user_info["email"]).first() is None:
+            try:
+                roles = u.pop("roles", [])
+                roles = db.session.query(Role).filter(Role.name.in_(roles)).all()
+                u.pop("id", [])
+                u.pop("uuid", [])
+                user = User(**u)
+                db.session.add(user)
+                db.session.commit()
+                user.roles = roles
+                db.session.refresh(user)
+                user_success.append(print_user(user))
+            except Exception:
+                user_failed.append(u)
+        else:
+            u["error"] = "user email already exists"
+            user_failed.append(u)
+
 def create_user(user_info):
     if db.session.query(User).filter(User.email == user_info["email"]).first() is None:
         #collections = user_info.get("collections", None)
@@ -93,6 +115,8 @@ def create_user(user_info):
         #user_info.pop("collections", None)
         #user_info.pop("files", None)
         #user_info.pop("roles", None)
+        user_info.pop("id", None)
+        user_info.pop("uuid", None)
         user = User(**user_info)
         user.orcid_id = None
         #user.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
@@ -139,10 +163,17 @@ def search_role(search, offset, limit):
     res_roles = roles[offset:(offset+limit)]
     return ([print_roles_short(x) for x in res_roles], len(roles))
 
+def search_policy(search, offset, limit):
+    policies = db.session.query(Policy)
+    policies = policies.filter(Policy.name.like("%{}%".format(search))).all()
+    res_policies = policies[offset:(offset+limit)]
+    return ([print_policy(x) for x in res_policies], len(policies))
+
 def print_roles_short(role):
     rol = {}
     rol["id"] = role.id
     rol["name"] = role.name
+    rol["description"] = role.description
     rol["policies"] = [x.id for x in role.policies]
     return rol
 
@@ -247,13 +278,17 @@ def list_roles():
         roles.append(r)
     return roles
 
+def get_role_by_id(role_id):
+    db_roles = Role.query.filter(Role.id == role_id).first()
+    return print_role(db_roles)
+
 def print_role(role):
     policies = []
     if role.policies is not None:
         for policy in role.policies:
             pp = print_policy(policy)
             policies.append(pp)
-    return({"id": role.id, "name": role.name, "policies": policies})
+    return({"id": role.id, "name": role.name, "description": role.description, "policies": policies})
 
 def print_policy(policy):
     pp = dict(policy.__dict__)

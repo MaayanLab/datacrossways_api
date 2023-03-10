@@ -168,6 +168,21 @@ def post_user():
         traceback.print_exc()
         return jsonify(message="An error occurred when creating user"), 500
 
+@app.route('/api/user/bulk', methods = ["POST"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def post_user_bulk():
+    try:
+        data = request.get_json()
+        users, failed_users = dbutils.create_users_bulk(data)
+        return jsonify({"message": "users created successfully", "users": users, "failed": failed_users}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when creating users"), 500
+
+
 @app.route('/api/user', methods = ["PATCH"])
 @accesskey_login
 @dev_login
@@ -516,6 +531,20 @@ def patch_role():
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to update role"), 500
 
+@app.route('/api/role/<int:role_id>', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_role_by_id(role_id):
+    try:
+        role = dbutils.get_role_by_id(role_id)
+        return jsonify({"message": "role retrieved", "role": role}), 200
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to get role"), 500
+        
+
 
 @app.route('/api/role/<int:role_id>', methods = ["DELETE"])
 @accesskey_login
@@ -529,7 +558,7 @@ def delete_role(role_id):
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to delete role"), 500
-        
+
 
 # ------------------- end role -------------------
 
@@ -783,6 +812,22 @@ def search_role():
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when searching roles"), 500
+
+@app.route('/api/policy/search', methods=["POST"])
+@accesskey_login
+@dev_login
+@login_required
+def search_policy():
+    try:
+        data = request.get_json()
+        offset = int(data.get("offset", 0))
+        limit = int(data.get("limit", 20))
+        search = data.get("search", None)
+        policies, policy_count = dbutils.search_policy(search, offset, limit)
+        return jsonify({"message": "policies searched successfully", "files": policies, "total": policy_count})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when searching policies"), 500
 
 @app.route('/api/news', methods=["GET"])
 @cache.cached(timeout=60)
