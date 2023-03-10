@@ -113,6 +113,39 @@ def delete_user(user_id):
     db.session.commit()
     return(r)
 
+def search_user(search, offset, limit):
+    users = db.session.query(User)
+    users = users.filter((User.first_name.like("%{}%".format(search))) | (User.last_name.like("%{}%".format(search))) | (User.affiliation.like("%{}%".format(search)))).all()
+    res_users = users[offset:(offset+limit)]
+    return ([print_user_short(x) for x in res_users], len(users))
+
+def search_collection(search, offset, limit):
+    collections = db.session.query(Collection)
+    collections = collections.filter((Collection.description.like("%{}%".format(search))) | (Collection.name.like("%{}%".format(search))) | (Collection.uuid.like("%{}%".format(search)))).all()
+    res_collections = collections[offset:(offset+limit)]
+    return ([print_collection_short(x) for x in res_collections], len(collections))
+
+def print_collection_short(collection):
+    col = {}
+    col["id"] = collection.id
+    col["uuid"] = collection.uuid
+    col["name"] = collection.name
+    col["description"] = collection.description
+    return col
+
+def search_role(search, offset, limit):
+    roles = db.session.query(Role)
+    roles = roles.filter(Role.name.like("%{}%".format(search))).all()
+    res_roles = roles[offset:(offset+limit)]
+    return ([print_roles_short(x) for x in res_roles], len(roles))
+
+def print_roles_short(role):
+    rol = {}
+    rol["id"] = role.id
+    rol["name"] = role.name
+    rol["policies"] = [x.id for x in role.policies]
+    return rol
+
 def list_user_quota(user_id):
     db_user = db.session.query(User).filter(User.id == user_id).first()
     db_files = db.session.query(File).filter(File.owner_id == user_id).all()
@@ -393,6 +426,18 @@ def print_user(user):
     user["roles"] = roles
     user["collections"] = collections
     return(user)
+
+def print_user_short(user):
+    ushort = {}
+    ushort["id"] = user.id
+    ushort["uuid"] = user.uuid
+    ushort["first_name"] = user.first_name
+    ushort["last_name"] = user.last_name
+    ushort["name"] = user.name
+    ushort["email"] = user.email
+    ushort["affiliation"] = user.affiliation
+    ushort["email"] = user.email
+    return ushort
 
 def print_file():
     return({})

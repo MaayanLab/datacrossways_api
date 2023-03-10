@@ -738,6 +738,52 @@ def keylogin():
     session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
     session.permanent = True
 
+@app.route('/api/user/search', methods=["POST"])
+@accesskey_login
+@dev_login
+@login_required
+def search_user():
+    try:
+        data = request.get_json()
+        offset = int(data.get("offset", 0))
+        limit = int(data.get("limit", 20))
+        search = data.get("search", None)
+        users, user_count = dbutils.search_user(search, offset, limit)
+        return jsonify({"message": "users searched successfully", "files": users, "total": user_count})
+    except Exception:
+        return jsonify(message="An error occurred when searching user"), 500
+
+@app.route('/api/collection/search', methods=["POST"])
+@accesskey_login
+@dev_login
+@login_required
+def search_collection():
+    try:
+        data = request.get_json()
+        offset = int(data.get("offset", 0))
+        limit = int(data.get("limit", 20))
+        search = data.get("search", None)
+        collections, collection_count = dbutils.search_collection(search, offset, limit)
+        return jsonify({"message": "collections searched successfully", "files": collections, "total": collection_count})
+    except Exception:
+        return jsonify(message="An error occurred when searching collections"), 500
+
+@app.route('/api/role/search', methods=["POST"])
+@accesskey_login
+@dev_login
+@login_required
+def search_role():
+    try:
+        data = request.get_json()
+        offset = int(data.get("offset", 0))
+        limit = int(data.get("limit", 20))
+        search = data.get("search", None)
+        roles, role_count = dbutils.search_role(search, offset, limit)
+        return jsonify({"message": "roles searched successfully", "files": roles, "total": role_count})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when searching roles"), 500
+
 @app.route('/api/news', methods=["GET"])
 @cache.cached(timeout=60)
 def get_news():
