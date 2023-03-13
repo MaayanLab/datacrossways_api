@@ -299,13 +299,13 @@ def print_policy(policy):
     for collection in policy.collections:
         c = dict(collection.__dict__)
         c.pop('_sa_instance_state', None)
-        collections.append(c["id"])
+        collections.append({"id":c["id"], "name":c["name"]})
 
     files = []
     for file in policy.files:
         f = dict(file.__dict__)
         f.pop('_sa_instance_state', None)
-        files.append(f["id"])
+        files.append({"id":f["id"], "display_name":f["display_name"]})
     pp["collections"] = collections
     pp["files"] = files
     return(pp)
@@ -381,9 +381,8 @@ def list_collection_files(user_id):
     return []
 
 def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
-    tt = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
-    print(time.time()-tt)
+
     tt = time.time()
 
     files = db.session.query(File)
@@ -405,8 +404,9 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     
     res_files = []
     tt = time.time()
+    check_admin = is_admin(user_id)
     for file in files:
-        if file.uuid in list_creds or file.visibility == "visible" or is_admin(user_id):
+        if file.uuid in list_creds or file.visibility == "visible" or check_admin:
             permissions = ["list"]
             if file.uuid in read_creds:
                 permissions.append("read")

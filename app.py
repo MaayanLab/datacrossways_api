@@ -539,6 +539,7 @@ def patch_role():
 def get_role_by_id(role_id):
     try:
         role = dbutils.get_role_by_id(role_id)
+        print(role)
         return jsonify({"message": "role retrieved", "role": role}), 200
     except Exception:
         traceback.print_exc()
