@@ -191,17 +191,14 @@ def update_user(user):
     user.pop("creation_date", None)
     user.pop("uuid", None)
     user.pop("id", None)
+    overwrite = user.pop("overwrite", False)
 
-    #collections = user["collections"]
-    #files = user["files"]
-    #roles = user["roles"]
-    #user.pop("collections", None)
-    #user.pop("files", None)
-    #user.pop("roles", None)
-
-    #dbuser.collections = list(set(dbuser.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
-    #dbuser.files  = list(set(dbuser.files + db.session.query(File).filter(File.id.in_(files)).all()))
-    #dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
+    roles = user.pop("roles", [])
+    
+    if overwrite:
+        dbuser.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
+    else:
+        dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
 
     if "name" in user:
         dbuser.name = user["name"]
@@ -257,9 +254,10 @@ def update_role(data):
     db.session.commit()
     return(print_role(dbrole))
 
-def create_role(role_name, policies=[]):
-    if db.session.query(Role).filter(Role.name == role_name).first() is None:
-        role = Role(name=role_name)
+def create_role(role_data):
+    if db.session.query(Role).filter(Role.name == role_data["name"]).first() is None:
+        role = Role(name=role_data["name"], description=role_data.pop("description", None))
+        policies = role_data.pop("policies", [])
         for p in policies:
             policy = db.session.query(Policy).filter(Policy.id == p).first()
             role.policies.append(policy)
@@ -455,7 +453,7 @@ def get_user_roles(userid):
 def print_user(user):
     roles = []
     for r in user.roles:
-        roles.append(r.id)
+        roles.append({"id": r.id, "name": r.name, "description": r.description})
     files = []
     for f in user.files:
         files.append(f.id)
@@ -684,14 +682,24 @@ def get_parent_collection_path(collection_id):
             collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
     return collection_path
 
-def update_file(db, file, updater_id):
+def update_file(db, file):
     db_file = db.session.query(File).filter(File.id == file["id"]).first()
-    db_file.display_name = file["display_name"]
-    db_file.owner_id = file["owner_id"]
-    db_file.collection_id = file["collection_id"]
-    db_file.visibility = file["visibility"]
-    db_file.status = file["status"]
-    db_file.accessibility = file["accessibility"]
+    
+    if "display_name" in file:
+        db_file.display_name = file["display_name"]
+    if "owner_id" in file:
+        db_file.owner_id = file["owner_id"]
+    if "collection_id" in file:
+        db_file.collection_id = file["collection_id"]
+    if "visibility" in file:
+        db_file.visibility = file["visibility"]
+    if "status" in file:
+        db_file.status = file["status"]
+    if "accessibility" in file:
+        db_file.accessibility = file["accessibility"]
+    if "meta" in file:
+        db_file.meta = file["meta"]
+
     db.session.commit()
 
 def list_policies():

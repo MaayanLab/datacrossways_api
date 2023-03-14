@@ -306,7 +306,7 @@ def post_file():
 def patch_file():
     try:
         file = request.get_json()
-        dbutils.update_file(db, file, session["user"]["id"])
+        dbutils.update_file(db, file)
         return jsonify(message="file updated"), 200
     except Exception:
         return jsonify(message="An error occurred when updating file"), 500
@@ -356,6 +356,7 @@ def get_file_by_id(file_id):
 @accesskey_login
 @dev_login
 @login_required
+@admin_required
 def delete_file(file_id):
     try:
         user = dict(session).get('user', None)
@@ -508,10 +509,7 @@ def get_role():
 def post_role():
     try:
         data = request.get_json()
-        pol = []
-        if "policies" in data.keys():
-            pol = data["policies"]
-        role = dbutils.create_role(data["rolename"], policies=pol)
+        role = dbutils.create_role(data)
         return jsonify({"message": "role created", "role": role}), 200
     except Exception:
         traceback.print_exc()
