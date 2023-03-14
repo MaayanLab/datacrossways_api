@@ -574,10 +574,10 @@ def update_collection(collection):
     print(files)
     if overwrite:
         for c in dbcollection.collections:
-            if c.id not in collections:
+            if c.id in collections:
                 c.parent_collection_id = 1
         for f in dbcollection.files:
-            if f.id not in files:
+            if f.id in files:
                 f.collection_id = 1
         dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
         dbcollection.files = db.session.query(File).filter(File.id.in_(files)).all()
