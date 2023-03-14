@@ -7,7 +7,7 @@ import s3utils
 from datetime import datetime
 from sqlalchemy.types import Integer, Float
 import time
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
@@ -52,7 +52,7 @@ def get_user_by_id_json(id):
     if db_user:
         role_list = []
         for role in db_user.roles:
-            role_list.append(role.name)   
+            role_list.append({"id": role.id, "name": role.name, "description": role.description})
         user = {"id": db_user.id, "name": db_user.name, "first_name": db_user.first_name, "last_name": db_user.last_name, "email": db_user.email, "affiliation": db_user.affiliation, "creation_date": db_user.creation_date, "uuid": db_user.uuid, "storage_quota": db_user.storage_quota, "roles": role_list}
     return user
 
@@ -417,16 +417,23 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
             res_files.append(f)
     #print(len(res_files))
     print(time.time()-tt)
+    tt = time.time()
     res_files_page = res_files[offset:(offset+limit)]
-
-    return add_file_detail(res_files_page), len(res_files)
+    rr = add_file_detail(res_files_page)
+    print(time.time()-tt)
+    return rr, len(res_files)
 
 def add_file_detail(files):
     for file in files:
-        file_details = db.session.query(File, User, Collection).filter(File.id == file["id"]).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).all()[0]
-        #print(file_details)
+        file_details = db.session.query(File, User, Collection).filter(File.id == file["id"]).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).first()
         owner = {"id": file_details[1].id, "first_name": file_details[1].first_name, "last_name": file_details[1].last_name}
         collection = {"id": file_details[2].id, "name": file_details[2].name}
+        
+        #file_user = db.session.query(User).filter(User.id == file["owner_id"]).first()
+        #file_collection = db.session.query(Collection).filter(Collection.id == file["collection_id"]).first()
+        #owner = {"id": file_user.id, "first_name": file_user.first_name, "last_name": file_user.last_name}
+        #collection = {"id": file_collection.id, "name": file_collection.name}
+        
         file["owner"] = owner
         file["collection"] = collection
     return files
@@ -604,9 +611,13 @@ def update_collection(collection):
     return(print_collection(dbcollection))
 
 def delete_collection(collection_id):
+    dbcollection = db.session.query(File).filter(File.collection_id == collection_id)
+    query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
+    db.session.execute(query)
+    db.session.commit()
     dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
     c = print_collection(dbcollection)
-    Collection.query.filter(id == collection_id).delete()
+    db.session.query(Collection).filter(Collection.id == collection_id).delete()
     db.session.commit()
     return(c)
 

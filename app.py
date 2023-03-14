@@ -544,8 +544,6 @@ def get_role_by_id(role_id):
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to get role"), 500
-        
-
 
 @app.route('/api/role/<int:role_id>', methods = ["DELETE"])
 @accesskey_login
@@ -704,6 +702,7 @@ def patch_collection():
 @login_required
 def delete_collection(collection_id):
     try:
+        print(collection_id)
         collection = dbutils.delete_collection(collection_id)
         return jsonify({"message": "collection deleted successfully", "collection": collection})
     except Exception:
