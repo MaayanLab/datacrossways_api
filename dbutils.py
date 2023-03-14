@@ -645,6 +645,7 @@ def get_collection(collection_id, user_id):
     #             permissions.append("write")
     #         temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "visibility": file.visibility, "accessibility": file.accessibility, 'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
     #         collection_return["child_files"].append(temp_file)
+    
     collection_return["path"] = get_parent_collection_path(collection_id)
     return collection_return
 
@@ -676,10 +677,12 @@ def get_parent_collection_path(collection_id):
     collection_path = []
     collection = Collection.query.filter(Collection.id==collection_id).first()
     collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
-    while collection.parent_collection_id:
+    while collection.parent_collection_id and collection.parent_collection_id != collection.id:
         if len(collection_path) < 30:
             collection = Collection.query.filter(Collection.id==collection.parent_collection_id).first()
             collection_path.insert(0,{"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid})
+        else:
+            break
     return collection_path
 
 def update_file(db, file):
