@@ -74,8 +74,8 @@ class File(db.Model):
     description = db.Column(db.String())
     creation_date = db.Column(db.DateTime, default=datetime.now)
     size = db.Column(db.Integer(), default=0)
-    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
-    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'), index=True, default=1)
+    owner_id = db.Column(db.Integer(), db.ForeignKey('users.id', onupdate='CASCADE'), index=True)
+    collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', onupdate='CASCADE'), index=True, default=1)
 
     meta = db.Column(mutable_json_type(dbtype=JSONB, nested=True), index=True)
     
@@ -96,7 +96,7 @@ class Collection(db.Model):
     description = db.Column(db.String())
     image_url = db.Column(db.String(), default="https://datacrosswayspublic.s3.amazonaws.com/collections/collection.jpg")
     creation_date = db.Column(db.DateTime, default=datetime.now)
-    parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id'), default=1, index=True)
+    parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', onupdate='CASCADE'), default=1, index=True)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="open")
@@ -104,6 +104,9 @@ class Collection(db.Model):
     # relationships
     collections = db.relationship('Collection', cascade='all, delete', backref=db.backref('parent', remote_side=[id]), lazy=True)
     files = db.relationship('File', cascade='all, delete', backref='collection', lazy=True)
+
+    #collections = db.relationship('Collection', cascade='all, delete', backref='parent_collection_id', lazy=True)
+    #files = db.relationship('File', cascade='all, delete', backref='collection_id', lazy=True)
     
     def __repr__(self):
         return f"{self.id}-{self.name}-{self.uuid}"

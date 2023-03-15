@@ -561,6 +561,7 @@ def create_collection(collection, user_id):
 
 def update_collection(collection):
     dbcollection = db.session.query(Collection).filter(Collection.id == collection["id"]).first()
+    dbroot = db.session.query(Collection).filter(Collection.id == 1).first()
     collection.pop("creation_date", None)
     collection.pop("uuid", None)
     collection.pop("id", None)
@@ -571,14 +572,16 @@ def update_collection(collection):
             raise Exception("Invalid child, child collection is also parent (circular collection path).")
     files = collection.pop("files", [])
     overwrite = collection.pop("overwrite", False)
-    print(files)
+
     if overwrite:
         for c in dbcollection.collections:
-            if c.id in collections:
+            if c.id not in collections:
                 c.parent_collection_id = 1
         for f in dbcollection.files:
-            if f.id in files:
+            if f.id not in files:
                 f.collection_id = 1
+        db.session.commit()
+        db.session.refresh(dbcollection)
         dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
         dbcollection.files = db.session.query(File).filter(File.id.in_(files)).all()
     else:
@@ -598,7 +601,8 @@ def update_collection(collection):
     if "owner_id" in collection:
         dbcollection.owner_id = collection["owner_id"]
     if "parent_collection_id" in collection:
-        dbcollection.parent_collection_id = collection["parent_collection_id"]
+        if collection["parent_collection_id"] != dbcollection.id:
+            dbcollection.parent_collection_id = collection["parent_collection_id"]
     if "visibility" in collection:
         dbcollection.visibility = collection["visibility"]
     if "accessibility" in collection:
@@ -609,15 +613,18 @@ def update_collection(collection):
     return(print_collection(dbcollection))
 
 def delete_collection(collection_id):
-    dbcollection = db.session.query(File).filter(File.collection_id == collection_id)
-    query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
-    db.session.execute(query)
-    db.session.commit()
-    dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
-    c = print_collection(dbcollection)
-    db.session.query(Collection).filter(Collection.id == collection_id).delete()
-    db.session.commit()
-    return(c)
+    if collection_id != 1:
+        dbcollection = db.session.query(File).filter(File.collection_id == collection_id)
+        query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
+        db.session.execute(query)
+        db.session.commit()
+        dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
+        c = print_collection(dbcollection)
+        db.session.query(Collection).filter(Collection.id == collection_id).delete()
+        db.session.commit()
+        return(c)
+    else:
+        raise Exception("root collection cannot be deleted")
 
 def get_collection(collection_id, user_id):
     (list_creds, read_creds, write_creds) = get_scope(user_id)
@@ -891,7 +898,6 @@ def get_file_metadata(db, file_id, user_id):
     return file.meta
 
 def get_file_by_id(file_id, user_id):
-    #file = File.query.filter(File.id == file_id).first()
     file = db.session.query(File, User, Collection).filter(File.id == file_id).filter(User.id == File.owner_id).filter(Collection.id == File.collection_id).first()
     owner = file[1]
     collection = file[2]
