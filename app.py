@@ -177,7 +177,13 @@ def post_user_bulk():
     try:
         data = request.get_json()
         users, failed_users = dbutils.create_users_bulk(data)
-        return jsonify({"message": "users created successfully", "users": users, "failed": failed_users}), 200
+        if len(users) > 0 & len(failed_users) == 0:
+            message = "all users created successfully"
+        elif len(users) > 0 & len(failed_users) > 0:
+            message = "some users created successfully, but some failed"
+        else:
+            message = "all users failed"
+        return jsonify({"message": message, "users": users, "failed": failed_users}), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when creating users"), 500

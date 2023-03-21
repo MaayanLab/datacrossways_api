@@ -89,12 +89,13 @@ def create_users_bulk(user_info):
     user_failed = []
     user_success = []
     for u in user_info:
-        if db.session.query(User).filter(User.email == user_info["email"]).first() is None:
+        if db.session.query(User).filter(User.email == u["email"]).first() is None:
             try:
                 roles = u.pop("roles", [])
                 roles = db.session.query(Role).filter(Role.name.in_(roles)).all()
                 u.pop("id", [])
                 u.pop("uuid", [])
+                print(u)
                 user = User(**u)
                 db.session.add(user)
                 db.session.commit()
@@ -102,10 +103,13 @@ def create_users_bulk(user_info):
                 db.session.refresh(user)
                 user_success.append(print_user(user))
             except Exception:
+                traceback.print_exc()
+                u["error"] = traceback.format_exc()
                 user_failed.append(u)
         else:
             u["error"] = "user email already exists"
             user_failed.append(u)
+    return (user_success, user_failed)
 
 def create_user(user_info):
     if db.session.query(User).filter(User.email == user_info["email"]).first() is None:
@@ -139,13 +143,13 @@ def delete_user(user_id):
 
 def search_user(search, offset, limit):
     users = db.session.query(User)
-    users = users.filter((User.first_name.like("%{}%".format(search))) | (User.last_name.like("%{}%".format(search))) | (User.affiliation.like("%{}%".format(search)))).all()
+    users = users.filter((User.first_name.ilike("%{}%".format(search))) | (User.last_name.ilike("%{}%".format(search))) | (User.affiliation.ilike("%{}%".format(search)))).all()
     res_users = users[offset:(offset+limit)]
     return ([print_user_short(x) for x in res_users], len(users))
 
 def search_collection(search, offset, limit):
     collections = db.session.query(Collection)
-    collections = collections.filter((Collection.description.like("%{}%".format(search))) | (Collection.name.like("%{}%".format(search))) | (Collection.uuid.like("%{}%".format(search)))).all()
+    collections = collections.filter((Collection.description.ilike("%{}%".format(search))) | (Collection.name.ilike("%{}%".format(search))) | (Collection.uuid.ilike("%{}%".format(search)))).all()
     res_collections = collections[offset:(offset+limit)]
     return ([print_collection_short(x) for x in res_collections], len(collections))
 
@@ -159,13 +163,13 @@ def print_collection_short(collection):
 
 def search_role(search, offset, limit):
     roles = db.session.query(Role)
-    roles = roles.filter(Role.name.like("%{}%".format(search))).all()
+    roles = roles.filter(Role.name.ilike("%{}%".format(search))).all()
     res_roles = roles[offset:(offset+limit)]
     return ([print_roles_short(x) for x in res_roles], len(roles))
 
 def search_policy(search, offset, limit):
     policies = db.session.query(Policy)
-    policies = policies.filter(Policy.name.like("%{}%".format(search))).all()
+    policies = policies.filter(Policy.name.ilike("%{}%".format(search))).all()
     res_policies = policies[offset:(offset+limit)]
     return ([print_policy(x) for x in res_policies], len(policies))
 
@@ -224,9 +228,8 @@ def delete_role(role_id):
     db.session.commit()
     return(r)
 
-def update_role(data):
+def update_role(role):
     overwrite = False
-    role = data["role"]
     dbrole = db.session.query(Role).filter(Role.id == role["id"]).first()
 
     dbpolicies = db.session.query(Policy).all()
@@ -234,11 +237,14 @@ def update_role(data):
     for p in dbpolicies:
         dbp.append(p.id)
 
-    if "overwrite" in data.keys():
-        overwrite = data["overwrite"]
+    if "overwrite" in role.keys():
+        overwrite = role["overwrite"]
 
-    if "name" in data["role"].keys():
-        dbrole.name = data["role"]["name"]
+    if "name" in role.keys():
+        dbrole.name = role["name"]
+
+    if "description" in role.keys():
+        dbrole.description = role["description"]
 
     if overwrite:
         dbrole.policies = []
@@ -256,11 +262,12 @@ def update_role(data):
 
 def create_role(role_data):
     if db.session.query(Role).filter(Role.name == role_data["name"]).first() is None:
-        role = Role(name=role_data["name"], description=role_data.pop("description", None))
+        role = Role(name=role_data["name"], description=role_data.pop("description", None), policies=[])
         policies = role_data.pop("policies", [])
         for p in policies:
             policy = db.session.query(Policy).filter(Policy.id == p).first()
-            role.policies.append(policy)
+            if policy is not None:
+                role.policies.append(policy)
         db.session.add_all([role])
         db.session.commit()
         db.session.refresh(role)
@@ -391,7 +398,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
         files = filterjson(db.session.query(File), File.meta, data)
     
     if file_name is not None:
-        files = files.filter(or_(File.display_name.like("%{}%".format(file_name)), File.description.like("%{}%".format(file_name))))
+        files = files.filter(or_(File.display_name.ilike("%{}%".format(file_name)), File.description.ilike("%{}%".format(file_name))))
     
     if owner_id is not None:
         files = files.filter(File.owner_id == owner_id)
@@ -724,17 +731,20 @@ def list_policies():
 
 def create_policy(data):
     collections = []
-    for collection in data["collections"]:
-        db_collection = db.session.query(Collection).filter(Collection.id==collection).first()
-        if db_collection is not None:
-            collections.append(db_collection)
+    if "collections" in data:
+        for collection in data["collections"]:
+            db_collection = db.session.query(Collection).filter(Collection.id==collection).first()
+            if db_collection is not None:
+                collections.append(db_collection)
     files = []
-    for file in data["files"]:
-        db_file = db.session.query(File).filter(File.id==file).first()
-        if db_file is not None:
-            files.append(db_file)
+    
+    if "files" in data:
+        for file in data["files"]:
+            db_file = db.session.query(File).filter(File.id==file).first()
+            if db_file is not None:
+                files.append(db_file)
 
-    policy = Policy(action=data["action"], effect=data["effect"], collections=collections, files=files)
+    policy = Policy(action=data["action"], effect=data["effect"], collections=collections, files=files, name=data.pop("name", None), description=data.pop("description", None))
     db.session.add_all([policy])
     db.session.commit()
     db.session.refresh(policy)
@@ -829,7 +839,7 @@ def filterjson(filter, file, j):
         elif j[k] == None:
             filter = filter.filter(file.has_key(k))
         elif "%" in j[k]:
-            filter = filter.filter(file[k].astext.like(j[k]))
+            filter = filter.filter(file[k].astext.ilike(j[k]))
         elif type(j[k]) == str:
             filter = filter.filter(file[k].astext == j[k])
         elif "between" in j[k].keys():

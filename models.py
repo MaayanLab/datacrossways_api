@@ -34,7 +34,7 @@ class User(db.Model):
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid, index=True)
     orcid_id = db.Column(db.String(), unique=True)
-    storage_quota = db.Column(db.Integer, default=100000)
+    storage_quota = db.Column(db.Integer(), default=100000)
 
     # relationships
     files = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
@@ -42,13 +42,14 @@ class User(db.Model):
     roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
     keys = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
 
-    def __init__(self, name, first_name, last_name, email, affiliation="", orcid_id=""):
+    def __init__(self, name, first_name, last_name, email, affiliation=None, orcid_id=None, storage_quota=10000):
         self.name = name
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
         self.affiliation = affiliation
         self.orcid_id = orcid_id
+        self.storage_quota = storage_quota
     
     def __repr__(self):
         return f"{self.id}-{self.name}-{self.email}-{self.uuid}"
