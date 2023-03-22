@@ -66,7 +66,7 @@ pool_size = db.engine.pool.size()
 print(f"Current pool size: {pool_size}")
 
 ### swagger specific ###
-SWAGGER_URL = '/rest'
+SWAGGER_URL = '/api/docs'
 API_URL = '/static/swagger.json'
 SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
     SWAGGER_URL,
