@@ -22,6 +22,8 @@ from datetime import timedelta
 from werkzeug.routing import BaseConverter
 from flask_caching import Cache
 
+from flask_swagger_ui import get_swaggerui_blueprint
+
 class IntListConverter(BaseConverter):
     regex = r'\d+(?:,\d+)*,?'
     def to_python(self, value):
@@ -38,7 +40,7 @@ def read_config():
     return json.load(f)
 
 app = Flask(__name__, 
-        static_url_path='/st',
+        static_url_path='/static',
         static_folder='static',
         template_folder='templates')
 
@@ -62,6 +64,19 @@ app.app_context().push()
 
 pool_size = db.engine.pool.size()
 print(f"Current pool size: {pool_size}")
+
+### swagger specific ###
+SWAGGER_URL = '/rest'
+API_URL = '/static/swagger.json'
+SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={
+        'app_name': "Seans-Python-Flask-REST-Boilerplate"
+    }
+)
+app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_URL)
+### end swagger specific ###
 
 #oauth config
 oauth = OAuth(app)

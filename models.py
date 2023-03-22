@@ -30,7 +30,7 @@ class User(db.Model):
     first_name = db.Column(db.String(), index=True)
     last_name = db.Column(db.String(), index=True)
     email = db.Column(db.String(), unique=True, nullable=True)
-    affiliation = db.Column(db.String())
+    affiliation = db.Column(db.String(), default="")
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid, index=True)
     orcid_id = db.Column(db.String(), unique=True)
@@ -42,7 +42,7 @@ class User(db.Model):
     roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
     keys = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
 
-    def __init__(self, name, first_name, last_name, email, affiliation=None, orcid_id=None, storage_quota=10000):
+    def __init__(self, name, first_name, last_name, email, affiliation="", orcid_id=None, storage_quota=10000):
         self.name = name
         self.first_name = first_name
         self.last_name = last_name
