@@ -36,8 +36,7 @@
             "externalDocs": {
                 "description": "Resource access if managed through user roles"
             }
-        }
-        ,
+        },
         {
             "name": "user",
             "description": "Access/modify users",
@@ -83,41 +82,41 @@
                         "description": "**successful operation** returns an array of file objects",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "files": {
                                     "$ref": "#/definitions/FileList"
                                 }
                             },
                             "example": {
                                 "files": [
-                                {
-                                    "accessibility": "locked",
-                                    "collection_id": 1,
-                                    "date": "Thu, 21 Jul 2022 13:16:13 GMT",
-                                    "display_name": "file_1.txt",
-                                    "id": 1,
-                                    "name": "file_1.txt",
-                                    "owner_id": 1,
-                                    "owner_name": "Alexander Lachmann",
-                                    "size": 0,
-                                    "status": "uploading",
-                                    "uuid": "4chUC8Fqt883",
-                                    "visibility": "hidden"
-                                },
-                                {
-                                    "accessibility": "locked",
-                                    "collection_id": 1,
-                                    "date": "Thu, 21 Jul 2022 13:16:13 GMT",
-                                    "display_name": "file_2.txt",
-                                    "id": 2,
-                                    "name": "file_2.txt",
-                                    "owner_id": 1,
-                                    "owner_name": "Alexander Lachmann",
-                                    "size": 0,
-                                    "status": "uploading",
-                                    "uuid": "6b3DbqiDjSHT",
-                                    "visibility": "hidden"
-                                }
+                                    {
+                                        "accessibility": "locked",
+                                        "collection_id": 1,
+                                        "date": "Tue, 21 Mar 2023 17:16:48 GMT",
+                                        "display_name": "file_1.txt",
+                                        "id": 1,
+                                        "name": "file_1.txt",
+                                        "owner_id": 1,
+                                        "owner_name": "Alexander Lachmann",
+                                        "size": 12312,
+                                        "status": "uploading",
+                                        "uuid": "3QArhEQWFRzP",
+                                        "visibility": "hidden"
+                                    },
+                                    {
+                                        "accessibility": "locked",
+                                        "collection_id": 1,
+                                        "date": "Tue, 21 Mar 2023 17:16:48 GMT",
+                                        "display_name": "file_2.txt",
+                                        "id": 2,
+                                        "name": "file_2.txt",
+                                        "owner_id": 1,
+                                        "owner_name": "Alexander Lachmann",
+                                        "size": 745610,
+                                        "status": "uploading",
+                                        "uuid": "5Cmyto7sKJ37",
+                                        "visibility": "hidden"
+                                    }
                                 ],
                                 "message": "files listed successfully",
                                 "total": 10011
@@ -213,7 +212,7 @@
                         "description": "**successful operation** when file was updated",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -227,7 +226,7 @@
                         "description": "**failed operation** returns an error if exception arises during data query",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -247,7 +246,7 @@
                 ]
             }
         },
-        "/file/{file_id}":{
+        "/file/{file_id}": {
             "delete": {
                 "tags": [
                     "file"
@@ -276,7 +275,7 @@
                                 "message": {
                                     "type": "string"
                                 },
-                                "file":{
+                                "file": {
                                     "$ref": "#/definitions/File"
                                 }
                             },
@@ -302,7 +301,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to delete file",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -316,7 +315,7 @@
                         "description": "**failed operation** returns an error if exception arises during file deletion",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -336,7 +335,7 @@
                 ]
             }
         },
-        "/file/download/{file_id}":{
+        "/file/download/{file_id}": {
             "get": {
                 "tags": [
                     "file"
@@ -365,7 +364,7 @@
                                 "message": {
                                     "type": "string"
                                 },
-                                "url":{
+                                "url": {
                                     "type": "string"
                                 }
                             },
@@ -379,7 +378,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to download file",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -393,7 +392,7 @@
                         "description": "**failed operation** returns an error if exception arises during URL signing",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -413,7 +412,7 @@
                 ]
             }
         },
-        "/file/upload":{
+        "/file/upload": {
             "post": {
                 "tags": [
                     "file"
@@ -456,10 +455,10 @@
                                 "message": {
                                     "type": "string"
                                 },
-                                "url":{
+                                "url": {
                                     "type": "string"
                                 },
-                                "file":{
+                                "file": {
                                     "$ref": "#/definitions/File"
                                 }
                             },
@@ -467,10 +466,10 @@
                                 "message": "URL signed",
                                 "url": {
                                     "fields": {
-                                      "AWSAccessKeyId": "AKIATLYJBTLG2T764LJB",
-                                      "key": "5SDSwiUlkoW/api_test_file.txt",
-                                      "policy": "sdS3S3ssaggIjIwMjItMDctMDdSDF4DSedsvbmRpdGlvbnMiOiDFGssdfxsdOiAibXNzbS10ZXN0In0sIHsia2V5IjogIjRFUkZERVlpVTVI==sdfSDfsdfs=",
-                                      "signature": "sdsX64SD$ds3n8zH+E72piAR=sdE"
+                                        "AWSAccessKeyId": "AKIATLYJBTLG2T764LJB",
+                                        "key": "5SDSwiUlkoW/api_test_file.txt",
+                                        "policy": "sdS3S3ssaggIjIwMjItMDctMDdSDF4DSedsvbmRpdGlvbnMiOiDFGssdfxsdOiAibXNzbS10ZXN0In0sIHsia2V5IjogIjRFUkZERVlpVTVI==sdfSDfsdfs=",
+                                        "signature": "sdsX64SD$ds3n8zH+E72piAR=sdE"
                                     },
                                     "url": "https://bucketname.s3.amazonaws.com/"
                                 },
@@ -494,7 +493,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to upload file",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -508,7 +507,7 @@
                         "description": "**failed operation** returns an error if exception arises during URL signing",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -528,7 +527,7 @@
                 ]
             }
         },
-        "/file/startmultipart":{
+        "/file/startmultipart": {
             "post": {
                 "tags": [
                     "file"
@@ -571,10 +570,10 @@
                                 "message": {
                                     "type": "string"
                                 },
-                                "upload_id":{
+                                "upload_id": {
                                     "type": "string"
                                 },
-                                "uuid":{
+                                "uuid": {
                                     "type": "string"
                                 }
                             },
@@ -589,7 +588,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to upload file",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -603,7 +602,7 @@
                         "description": "**failed operation** returns an error if exception arises during multipart upload start",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -623,7 +622,7 @@
                 ]
             }
         },
-        "/file/signmultipart":{
+        "/file/signmultipart": {
             "post": {
                 "tags": [
                     "file"
@@ -670,7 +669,7 @@
                                 "message": {
                                     "type": "string"
                                 },
-                                "url":{
+                                "url": {
                                     "type": "string"
                                 }
                             },
@@ -684,7 +683,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to upload file",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -698,7 +697,7 @@
                         "description": "**failed operation** returns an error if exception arises during multipart upload URL signing",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -718,7 +717,7 @@
                 ]
             }
         },
-        "/file/completemultipart":{
+        "/file/completemultipart": {
             "post": {
                 "tags": [
                     "file"
@@ -796,7 +795,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to upload file",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -810,7 +809,7 @@
                         "description": "**failed operation** returns an error if exception arises during multipart completion",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -848,8 +847,7 @@
                         "required": true,
                         "schema": {
                             "type": "object",
-                            "properties": {
-                            },
+                            "properties": {},
                             "example": {
                                 "query": {
                                     "creator": {
@@ -858,6 +856,8 @@
                                     "library_strategy": "RNA-Seq",
                                     "file_type": "fastq"
                                 },
+                                "owner_id": 1,
+                                "collection_id": 1,
                                 "from": 0,
                                 "limit": 20
                             }
@@ -871,81 +871,34 @@
                             "$ref": "#/definitions/FileList"
                         },
                         "example": {
-                            "files":[
-                               {
-                                  "accessibility":"locked",
-                                  "collection_id":2,
-                                  "creation_date":"Thu, 21 Jul 2022 13:16:14 GMT",
-                                  "description":"None",
-                                  "display_name":"file_0.txt",
-                                  "id":12,
-                                  "meta":{
-                                     "array":[
-                                        1,
-                                        3,
-                                        4,
-                                        5
-                                     ],
-                                     "creator":{
-                                        "affiliation":"mssm",
-                                        "name":"c0",
-                                        "present":true
-                                     },
-                                     "extra":0,
-                                     "id":0,
-                                     "project":"p0",
-                                     "subject":{
-                                        "age":84,
-                                        "ethnicity":"Hispanic",
-                                        "gender":"female",
-                                        "id":0
-                                     }
-                                  },
-                                  "name":"file_0.txt",
-                                  "owner_id":1,
-                                  "size":0,
-                                  "status":"uploading",
-                                  "uuid":"4w56sMZcDZxME",
-                                  "visibility":"hidden"
-                               },
-                               {
-                                  "accessibility":"locked",
-                                  "collection_id":2,
-                                  "creation_date":"Thu, 21 Jul 2022 13:16:14 GMT",
-                                  "description":"None",
-                                  "display_name":"file_1.txt",
-                                  "id":13,
-                                  "meta":{
-                                     "array":[
-                                        1,
-                                        3,
-                                        4,
-                                        5
-                                     ],
-                                     "creator":{
-                                        "affiliation":"mssm",
-                                        "name":"c1",
-                                        "present":true
-                                     },
-                                     "id":1,
-                                     "project":"p1",
-                                     "subject":{
-                                        "age":13,
-                                        "ethnicity":"White",
-                                        "gender":"male",
-                                        "id":1
-                                     }
-                                  },
-                                  "name":"file_1.txt",
-                                  "owner_id":1,
-                                  "size":0,
-                                  "status":"uploading",
-                                  "uuid":"4YDMCds38wt",
-                                  "visibility":"hidden"
-                               }
+                            "files": [
+                                {
+                                    "accessibility": "locked",
+                                    "collection": {
+                                        "id": 1,
+                                        "name": "root"
+                                    },
+                                    "collection_id": 1,
+                                    "creation_date": "Tue, 21 Mar 2023 17:16:48 GMT",
+                                    "description": "dscription of file",
+                                    "display_name": "file_1.txt",
+                                    "id": 1,
+                                    "meta": {},
+                                    "name": "file_1.txt",
+                                    "owner": {
+                                        "first_name": "Alexander",
+                                        "id": 1,
+                                        "last_name": "Lachmann"
+                                    },
+                                    "owner_id": 1,
+                                    "size": 0,
+                                    "status": "uploading",
+                                    "uuid": "3QArhEQWFRzP",
+                                    "visibility": "hidden"
+                                }
                             ],
-                            "message":"files searched successfully",
-                            "total":10000
+                            "message": "files searched successfully",
+                            "total": 1
                         }
                     },
                     "500": {
@@ -976,16 +929,18 @@
                         "description": "**successful operation** returns the file filters",
                         "schema": {
                             "type": "object",
-                            "properties": {
-                            },
+                            "properties": {},
                             "example": {
                                 "filters": {
                                     "/creator/name": {
-                                            "Alexander Lachmann": 10,
-                                            "Avi Ma'ayan": 15
+                                        "Alexander Lachmann": 10,
+                                        "Avi Ma'ayan": 15
                                     }
                                 },
-                                "/subject/gender": {"female": 5027, "male": 4973}
+                                "/subject/gender": {
+                                    "female": 5027,
+                                    "male": 4973
+                                }
                             }
                         }
                     },
@@ -1028,8 +983,7 @@
                         "required": true,
                         "schema": {
                             "type": "object",
-                            "properties": {
-                            },
+                            "properties": {},
                             "example": {
                                 "creator": {
                                     "name": "Alexander Lachmann"
@@ -1060,7 +1014,7 @@
                 ]
             }
         },
-        "/role":{
+        "/role": {
             "get": {
                 "tags": [
                     "role"
@@ -1079,43 +1033,28 @@
                             },
                             "example": {
                                 "roles": [
-                                  {
-                                    "id": 1,
-                                    "name": "admin",
-                                    "policies": []
-                                  },
-                                  {
-                                    "id": 2,
-                                    "name": "collection_lister",
-                                    "policies": [
-                                      {
-                                        "action": "list",
-                                        "collections": [
-                                          1
-                                        ],
-                                        "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
-                                        "effect": "allow",
-                                        "files": [],
-                                        "id": 1
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "id": 3,
-                                    "name": "collection_reader",
-                                    "policies": [
-                                      {
-                                        "action": "read",
-                                        "collections": [
-                                          2
-                                        ],
-                                        "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
-                                        "effect": "allow",
-                                        "files": [],
-                                        "id": 2
-                                      }
-                                    ]
-                                  }
+                                    {
+                                        "description": null,
+                                        "id": 3,
+                                        "name": "lyme_lister",
+                                        "policies": [
+                                            {
+                                                "action": "list",
+                                                "collections": [
+                                                    {
+                                                        "id": 1,
+                                                        "name": "root"
+                                                    }
+                                                ],
+                                                "creation_date": "Tue, 21 Mar 2023 17:16:53 GMT",
+                                                "description": null,
+                                                "effect": "allow",
+                                                "files": [],
+                                                "id": 1,
+                                                "name": null
+                                            }
+                                        ]
+                                    }
                                 ]
                             }
                         }
@@ -1124,7 +1063,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to list roles",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1138,7 +1077,7 @@
                         "description": "**failed operation** returns an error if exception arises while listing roles",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1171,7 +1110,7 @@
                         "required": true,
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "rolename": {
                                     "type": "string"
                                 },
@@ -1191,7 +1130,9 @@
                                     2
                                 ]
                             },
-                            "required": ["rolename"]
+                            "required": [
+                                "rolename"
+                            ]
                         }
                     }
                 ],
@@ -1217,26 +1158,26 @@
                                     "id": 8,
                                     "name": "test_role",
                                     "policies": [
-                                    {
-                                        "action": "list",
-                                        "collections": [
-                                        1
-                                        ],
-                                        "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
-                                        "effect": "allow",
-                                        "files": [],
-                                        "id": 1
-                                    },
-                                    {
-                                        "action": "read",
-                                        "collections": [
-                                        2
-                                        ],
-                                        "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
-                                        "effect": "allow",
-                                        "files": [],
-                                        "id": 2
-                                    }
+                                        {
+                                            "action": "list",
+                                            "collections": [
+                                                1
+                                            ],
+                                            "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
+                                            "effect": "allow",
+                                            "files": [],
+                                            "id": 1
+                                        },
+                                        {
+                                            "action": "read",
+                                            "collections": [
+                                                2
+                                            ],
+                                            "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
+                                            "effect": "allow",
+                                            "files": [],
+                                            "id": 2
+                                        }
                                     ]
                                 }
                             }
@@ -1246,7 +1187,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to create roles",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1260,7 +1201,7 @@
                         "description": "**failed operation** returns an error if exception arises while creating roles",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1306,19 +1247,19 @@
                                 }
                             },
                             "example": {
-                                "overwrite": true,
-                                "role": {
-                                    "id": 6,
-                                    "name": "new_policy",
-                                    "policies": [
-                                        1,
-                                        2,
-                                        3,
-                                        4
-                                    ]
-                                }
+                                "id": 9,
+                                "name": "mynewrole_patch",
+                                "description": "this can do all sorts of stuff patch",
+                                "policies": [
+                                    4,
+                                    5,
+                                    6
+                                ],
+                                "overwrite": true
                             },
-                            "required": ["role"]
+                            "required": [
+                                "role"
+                            ]
                         }
                     }
                 ],
@@ -1336,15 +1277,42 @@
                                 }
                             },
                             "example": {
-                                "overwrite": true,
+                                "message": "role updated",
                                 "role": {
-                                    "id": 6,
-                                    "name": "new_policy",
+                                    "description": "this can do all sorts of stuff patch",
+                                    "id": 9,
+                                    "name": "mynewrole_patch",
                                     "policies": [
-                                        1,
-                                        2,
-                                        3,
-                                        4
+                                        {
+                                            "action": "read",
+                                            "collections": [
+                                                {
+                                                    "id": 2,
+                                                    "name": "lyme_data"
+                                                }
+                                            ],
+                                            "creation_date": "Tue, 21 Mar 2023 13:59:47 GMT",
+                                            "description": "this can do all sorts of stuff",
+                                            "effect": "allow",
+                                            "files": [],
+                                            "id": 5,
+                                            "name": "candostuffandmore"
+                                        },
+                                        {
+                                            "action": "read",
+                                            "collections": [
+                                                {
+                                                    "id": 2,
+                                                    "name": "lyme_data"
+                                                }
+                                            ],
+                                            "creation_date": "Tue, 21 Mar 2023 14:01:04 GMT",
+                                            "description": "this can do all sorts of stuff",
+                                            "effect": "allow",
+                                            "files": [],
+                                            "id": 6,
+                                            "name": "candostuffandmore2"
+                                        }
                                     ]
                                 }
                             }
@@ -1354,7 +1322,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to update role",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1368,7 +1336,7 @@
                         "description": "**failed operation** returns an error if exception arises while updating role",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1388,7 +1356,7 @@
                 ]
             }
         },
-        "/role/{role_id}":{
+        "/role/{role_id}": {
             "delete": {
                 "tags": [
                     "role"
@@ -1438,7 +1406,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to delete role",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1452,7 +1420,7 @@
                         "description": "**failed operation** returns an error if exception arises during role deletion",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1472,7 +1440,7 @@
                 ]
             }
         },
-        "/policy":{
+        "/policy": {
             "get": {
                 "tags": [
                     "policy"
@@ -1491,22 +1459,37 @@
                             },
                             "example": {
                                 "polcies": [
-                                  {
-                                    "id": 1,
-                                    "action": "read",
-                                    "effect": "allow",
-                                    "creation_date": "Thu, 30 Jun 2022 11:42:24 GMT",
-                                    "collections": [1,2],
-                                    "files": [8,9]
-                                  },
-                                  {
-                                    "id": 2,
-                                    "action": "write",
-                                    "effect": "allow",
-                                    "creation_date": "Thu, 30 Jun 2022 11:42:24 GMT",
-                                    "collections": [1,2],
-                                    "files": [8]
-                                  }
+                                    {
+                                        "id": 1,
+                                        "name": "policy name 1",
+                                        "description": "useful description",
+                                        "action": "read",
+                                        "effect": "allow",
+                                        "creation_date": "Thu, 30 Jun 2022 11:42:24 GMT",
+                                        "collections": [
+                                            1,
+                                            2
+                                        ],
+                                        "files": [
+                                            8,
+                                            9
+                                        ]
+                                    },
+                                    {
+                                        "id": 2,
+                                        "name": "policy name 2",
+                                        "description": "useful description",
+                                        "action": "write",
+                                        "effect": "allow",
+                                        "creation_date": "Thu, 30 Jun 2022 11:42:24 GMT",
+                                        "collections": [
+                                            1,
+                                            2
+                                        ],
+                                        "files": [
+                                            8
+                                        ]
+                                    }
                                 ]
                             }
                         }
@@ -1515,7 +1498,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to list policies",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1529,7 +1512,7 @@
                         "description": "**failed operation** returns an error if exception arises while listing policies",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1565,6 +1548,8 @@
                                 "$ref": "#/definitions/Policy"
                             },
                             "example": {
+                                "name": "policy name",
+                                "description": "useful description",
                                 "action": "read",
                                 "effect": "allow",
                                 "collections": [
@@ -1603,26 +1588,26 @@
                                     "id": 8,
                                     "name": "test_policy",
                                     "policies": [
-                                    {
-                                        "action": "list",
-                                        "collections": [
-                                        1
-                                        ],
-                                        "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
-                                        "effect": "allow",
-                                        "files": [],
-                                        "id": 1
-                                    },
-                                    {
-                                        "action": "read",
-                                        "collections": [
-                                        2
-                                        ],
-                                        "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
-                                        "effect": "allow",
-                                        "files": [],
-                                        "id": 2
-                                    }
+                                        {
+                                            "action": "list",
+                                            "collections": [
+                                                1
+                                            ],
+                                            "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
+                                            "effect": "allow",
+                                            "files": [],
+                                            "id": 1
+                                        },
+                                        {
+                                            "action": "read",
+                                            "collections": [
+                                                2
+                                            ],
+                                            "creation_date": "Thu, 30 Jun 2022 13:42:22 GMT",
+                                            "effect": "allow",
+                                            "files": [],
+                                            "id": 2
+                                        }
                                     ]
                                 }
                             }
@@ -1632,7 +1617,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to create policy",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1646,7 +1631,7 @@
                         "description": "**failed operation** returns an error if exception arises while creating policy",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1666,7 +1651,7 @@
                 ]
             }
         },
-        "/policy/{policy_id}":{
+        "/policy/{policy_id}": {
             "delete": {
                 "tags": [
                     "policy"
@@ -1715,7 +1700,7 @@
                                         3,
                                         6,
                                         19
-                                    ]       
+                                    ]
                                 }
                             }
                         }
@@ -1724,7 +1709,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to delete policy",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1738,7 +1723,7 @@
                         "description": "**failed operation** returns an error if exception arises during policy deletion",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1758,7 +1743,127 @@
                 ]
             }
         },
-        "/user":{
+        "/policy/search":{
+            "post":{
+                "tags": [
+                    "user"
+                ],
+                "summary": "Create user",
+                "description": "Create new user.",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "User information including **file IDs**, **role IDs**, and **collection IDs**.",
+                        "required": true,
+                        "schema": {
+                            "user": {
+                                "$ref": "#/definitions/User"
+                            },
+                            "example": {
+                                "name": "Jane Doe",
+                                "first_name": "Jane",
+                                "last_name": "Doe",
+                                "affiliation": "Mount Sinai Hospital",
+                                "email": "jd@mssm.edu",
+                                "collections": [
+                                    1,
+                                    2
+                                ],
+                                "files": [
+                                    1,
+                                    2
+                                ],
+                                "roles": [
+                                    2,
+                                    3
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "**successful operation** when role was created",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "role": {
+                                    "$ref": "#/definitions/Role"
+                                }
+                            },
+                            "example": {
+                                "message": "user created successfully",
+                                "user": {
+                                    "affiliation": "Mount Sinai Hospital",
+                                    "collections": [
+                                        1,
+                                        2
+                                    ],
+                                    "creation_date": "Mon, 11 Jul 2022 23:28:15 GMT",
+                                    "email": "jd8@mssm.edu",
+                                    "files": [
+                                        1,
+                                        2
+                                    ],
+                                    "first_name": "Jane",
+                                    "id": 9,
+                                    "last_name": "Doe",
+                                    "name": "Jane Doe",
+                                    "roles": [
+                                        2,
+                                        3
+                                    ],
+                                    "uuid": "7CeD2UAQSiwF"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "**permission denied** returns an error if user does not have permission to create users",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "example": {
+                                "message": "No permission to create users"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "**failed operation** returns an error if exception arises while searching policy",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "example": {
+                                "message": "An error occurred when attempting to create user"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "datacrossways_auth": [
+                            "admin"
+                        ]
+                    }
+                ]
+            }
+        },
+        "/user": {
             "get": {
                 "tags": [
                     "user"
@@ -1778,71 +1883,37 @@
                             "example": {
                                 "users": [
                                     {
-                                      "affiliation": "Mount Sinai Hospital",
-                                      "collections": [
-                                        1,
-                                        2,
-                                        3
-                                      ],
-                                      "creation_date": "Mon, 11 Jul 2022 13:23:44 GMT",
-                                      "email": "alder.lacnn@mssm.edu",
-                                      "files": [
-                                        1,
-                                        2,
-                                        11
-                                      ],
-                                      "first_name": "Alexander",
-                                      "id": 1,
-                                      "last_name": "Lachmann",
-                                      "name": "Alexander Lachmann",
-                                      "roles": [
-                                        1,
-                                        2,
-                                        3
-                                      ],
-                                      "uuid": "4swYp34gasdBX"
-                                    },
-                                    {
-                                      "affiliation": "Mount Sinai Hospital",
-                                      "collections": [],
-                                      "creation_date": "Mon, 11 Jul 2022 13:23:44 GMT",
-                                      "email": "u8asdd@mssm.edu",
-                                      "files": [
-                                        3,
-                                        4,
-                                        5,
-                                        6
-                                      ],
-                                      "first_name": "Daniel",
-                                      "id": 2,
-                                      "last_name": "Clarke",
-                                      "name": "Daniel Clarke",
-                                      "roles": [],
-                                      "uuid": "7MasdNeCgD"
-                                    },
-                                    {
-                                      "affiliation": "Mount Sinai Hospital",
-                                      "collections": [
-                                        2
-                                      ],
-                                      "creation_date": "Mon, 11 Jul 2022 13:23:44 GMT",
-                                      "email": "aas.maasan@mssm.edu",
-                                      "files": [
-                                        7,
-                                        8,
-                                        9,
-                                        10
-                                      ],
-                                      "first_name": "Avi",
-                                      "id": 3,
-                                      "last_name": "Ma'ayan",
-                                      "name": "Avi Ma'ayan",
-                                      "roles": [
-                                        2
-                                      ],
-                                      "uuid": "3AyaasdLZ7uH"
+                                        "affiliation": "Mount Sinai Hospital",
+                                        "collections": [2,3],
+                                        "creation_date": "Mon, 11 Jul 2022 13:23:44 GMT",
+                                        "email": "u8asdd@mssm.edu",
+                                        "orcid_id": "0000-0002-1982-7652",
+                                        "storage_quota": 10000,
+                                        "files": [
+                                            3,
+                                            4,
+                                            5,
+                                            6
+                                        ],
+                                        "first_name": "Daniel",
+                                        "id": 2,
+                                        "last_name": "Clarke",
+                                        "name": "Daniel Clarke",
+                                        "roles": [
+                                            {
+                                                "description": null,
+                                                "id": 2,
+                                                "name": "uploader"
+                                            },
+                                            {
+                                                "description": null,
+                                                "id": 3,
+                                                "name": "lyme_lister"
+                                            }
+                                        ],
+                                        "uuid": "7MasdNeCgD"
                                     }
-                                  ]
+                                ]
                             }
                         }
                     },
@@ -1850,7 +1921,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to list users",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1864,7 +1935,7 @@
                         "description": "**failed operation** returns an error if exception arises while listing users",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1968,7 +2039,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to create users",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -1982,7 +2053,7 @@
                         "description": "**failed operation** returns an error if exception arises while creating user",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2047,7 +2118,9 @@
                                 ],
                                 "uuid": "7CeD2UAQSiwF"
                             },
-                            "required": ["id"]
+                            "required": [
+                                "id"
+                            ]
                         }
                     }
                 ],
@@ -2094,7 +2167,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to update user",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2108,7 +2181,7 @@
                         "description": "**failed operation** returns an error if exception arises while updating user",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2128,7 +2201,7 @@
                 ]
             }
         },
-        "/user/i":{
+        "/user/i": {
             "get": {
                 "tags": [
                     "user"
@@ -2146,13 +2219,37 @@
                                 "$ref": "#/definitions/UserInfo"
                             },
                             "example": {
-                                    "id": 1,
-                                    "uuid": "3asdEzZRjh",
-                                    "admin": true,
-                                    "uploader": true,
-                                    "email": "alexander.lachmann@mssm.com",
-                                    "first_name": "Alexander",
-                                    "last_name": "Lachmann"
+                                "affiliation": "Mount Sinai Hospital",
+                                "creation_date": "Tue, 21 Mar 2023 17:16:47 GMT",
+                                "email": "alexander.lachmann@test.com",
+                                "first_name": "Alexander",
+                                "id": 1,
+                                "last_name": "Lachmann",
+                                "name": "Alexander Lachmann",
+                                "roles": [
+                                    {
+                                        "description": null,
+                                        "id": 1,
+                                        "name": "admin"
+                                    },
+                                    {
+                                        "description": null,
+                                        "id": 2,
+                                        "name": "uploader"
+                                    },
+                                    {
+                                        "description": null,
+                                        "id": 3,
+                                        "name": "lyme_lister"
+                                    },
+                                    {
+                                        "description": null,
+                                        "id": 4,
+                                        "name": "lyme_reader"
+                                    }
+                                ],
+                                "storage_quota": 10000,
+                                "uuid": "5jrU234SDfh"
                             }
                         }
                     },
@@ -2160,7 +2257,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to list keys",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2174,7 +2271,7 @@
                         "description": "**failed operation** returns an error if exception arises while listing keys",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2194,7 +2291,7 @@
                 ]
             }
         },
-        "/user/{user_id}":{
+        "/user/{user_id}": {
             "delete": {
                 "tags": [
                     "user"
@@ -2232,22 +2329,22 @@
                                 "role": {
                                     "affiliation": "Mount Sinai Hospital",
                                     "collections": [
-                                    1,
-                                    2
+                                        1,
+                                        2
                                     ],
                                     "creation_date": "Mon, 11 Jul 2022 23:28:15 GMT",
                                     "email": "jd8@mssm.edu",
                                     "files": [
-                                    1,
-                                    2
+                                        1,
+                                        2
                                     ],
                                     "first_name": "Jane",
                                     "id": 9,
                                     "last_name": "Doe",
                                     "name": "Jane Doe",
                                     "roles": [
-                                    2,
-                                    3
+                                        2,
+                                        3
                                     ],
                                     "uuid": "7CeD2UAQSiwF"
                                 }
@@ -2258,7 +2355,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to delete user",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2272,7 +2369,7 @@
                         "description": "**failed operation** returns an error if exception arises during user deletion",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2292,7 +2389,7 @@
                 ]
             }
         },
-        "/user/files": {
+        "/user/file": {
             "get": {
                 "tags": [
                     "user"
@@ -2325,41 +2422,57 @@
                         "description": "**successful operation** returns an array of file objects",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "files": {
                                     "$ref": "#/definitions/FileList"
                                 }
                             },
                             "example": {
                                 "files": [
-                                {
-                                    "accessibility": "locked",
-                                    "collection_id": 1,
-                                    "date": "Thu, 21 Jul 2022 13:16:13 GMT",
-                                    "display_name": "file_1.txt",
-                                    "id": 1,
-                                    "name": "file_1.txt",
-                                    "owner_id": 1,
-                                    "owner_name": "Alexander Lachmann",
-                                    "size": 0,
-                                    "status": "uploading",
-                                    "uuid": "4chUC8Fqt883",
-                                    "visibility": "hidden"
-                                },
-                                {
-                                    "accessibility": "locked",
-                                    "collection_id": 1,
-                                    "date": "Thu, 21 Jul 2022 13:16:13 GMT",
-                                    "display_name": "file_2.txt",
-                                    "id": 2,
-                                    "name": "file_2.txt",
-                                    "owner_id": 1,
-                                    "owner_name": "Alexander Lachmann",
-                                    "size": 0,
-                                    "status": "uploading",
-                                    "uuid": "6b3DbqiDjSHT",
-                                    "visibility": "hidden"
-                                }
+                                    {
+                                        "accessibility": "locked",
+                                        "collection": {
+                                            "id": 1,
+                                            "name": "root",
+                                            "uuid": "86Te7huTvsd7"
+                                        },
+                                        "date": "Tue, 21 Mar 2023 17:16:48 GMT",
+                                        "display_name": "file_1.txt",
+                                        "id": 1,
+                                        "name": "file_1.txt",
+                                        "owner": {
+                                            "first_name": "Alexander",
+                                            "id": 1,
+                                            "last_name": "Lachmann",
+                                            "uuid": "5jrU4CrtEuFc"
+                                        },
+                                        "size": 0,
+                                        "status": "uploading",
+                                        "uuid": "3QArhEQWFRzP",
+                                        "visibility": "hidden"
+                                    },
+                                    {
+                                        "accessibility": "locked",
+                                        "collection": {
+                                            "id": 1,
+                                            "name": "root",
+                                            "uuid": "86Te7huTvsd7"
+                                        },
+                                        "date": "Tue, 21 Mar 2023 17:16:48 GMT",
+                                        "display_name": "file_2.txt",
+                                        "id": 2,
+                                        "name": "file_2.txt",
+                                        "owner": {
+                                            "first_name": "Alexander",
+                                            "id": 1,
+                                            "last_name": "Lachmann",
+                                            "uuid": "5jrU4CrtEuFc"
+                                        },
+                                        "size": 0,
+                                        "status": "uploading",
+                                        "uuid": "5Cmyto7sKJ37",
+                                        "visibility": "hidden"
+                                    }
                                 ],
                                 "message": "files listed successfully",
                                 "total": 10011
@@ -2379,7 +2492,7 @@
                 ]
             }
         },
-        "/user/accesskey":{
+        "/user/accesskey": {
             "get": {
                 "tags": [
                     "user"
@@ -2403,14 +2516,14 @@
                                         "expiration_time": 1000,
                                         "id": 1,
                                         "uuid": "eLUqKTtCiQEQdYsKaHFjc9zXPwgNuYA7"
-                                      },
-                                      {
+                                    },
+                                    {
                                         "creation_date": "Tue, 19 Jul 2022 12:19:34 GMT",
                                         "expiration_time": 1000,
                                         "id": 2,
                                         "uuid": "WrTRLk5iE7iUFSxDAoxNtX6Sdl23LkVi"
-                                      }
-                                  ],
+                                    }
+                                ],
                                 "message": "keys successfully listed"
                             }
                         }
@@ -2419,7 +2532,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to list keys",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2433,7 +2546,7 @@
                         "description": "**failed operation** returns an error if exception arises while listing keys",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2453,7 +2566,7 @@
                 ]
             }
         },
-        "/user/accesskey/{exp_time}":{
+        "/user/accesskey/{exp_time}": {
             "post": {
                 "tags": [
                     "user"
@@ -2487,7 +2600,6 @@
                                 }
                             },
                             "example": {
-                                "message": "key created successfully",
                                 "key": {
                                     "creation_date": "Tue, 19 Jul 2022 12:20:40 GMT",
                                     "expiration_time": 1000,
@@ -2495,7 +2607,7 @@
                                     "name": null,
                                     "owner_id": 1,
                                     "uuid": "aUWot8D8UkZGTWVPpWLTDwFDA3JjaPcM"
-                                  }
+                                }
                             }
                         }
                     },
@@ -2503,7 +2615,7 @@
                         "description": "**permission denied** returns an error if user does not have permission to create key",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2517,7 +2629,7 @@
                         "description": "**failed operation** returns an error if exception arises during key generation",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2537,7 +2649,7 @@
                 ]
             }
         },
-        "/collection":{
+        "/collection": {
             "get": {
                 "tags": [
                     "collection"
@@ -2611,7 +2723,7 @@
                         "description": "**permission denied** returns an error if collection does not have permission to list collections",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2625,7 +2737,7 @@
                         "description": "**failed operation** returns an error if exception arises while listing collections",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2654,7 +2766,7 @@
                     {
                         "in": "body",
                         "name": "body",
-                        "description": "Collection information including **file IDs** and **collection IDs**.",
+                        "description": "Collection information. Files and collection can be added after creation using PATCH.",
                         "required": true,
                         "schema": {
                             "collection": {
@@ -2662,14 +2774,7 @@
                             },
                             "example": {
                                 "accessibility": "locked",
-                                "collections": [],
-                                "description": null,
-                                "files": [
-                                    3,
-                                    4,
-                                    5,
-                                    6
-                                ],
+                                "description": "Collection information",
                                 "image_url": "https://datacrosswayspublic.s3.amazonaws.com/collections/collection.jpg",
                                 "name": "new_collection",
                                 "visibility": "visible"
@@ -2721,7 +2826,7 @@
                         "description": "**permission denied** returns an error if collection does not have permission to create collections",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2735,7 +2840,7 @@
                         "description": "**failed operation** returns an error if exception arises while creating collection",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2759,7 +2864,7 @@
                     "collection"
                 ],
                 "summary": "Update collection",
-                "description": "Update collection with matching ID. **files** and **collections** are added to the existing files and collections. To remove files or collections, move them or delete them directly.",
+                "description": "Update collection with matching ID. **files** and **collections** are added to the existing files and collections when overwrite is false. If overwrite is true all files and collections are sropped and the new files and collections added.",
                 "produces": [
                     "application/json"
                 ],
@@ -2781,16 +2886,21 @@
                                 "collections": [],
                                 "description": null,
                                 "files": [
-                                    7
+                                    7,
+                                    8,
+                                    9
                                 ],
                                 "id": 4,
                                 "image_url": "https://datacrosswayspublic.s3.amazonaws.com/collections/newimage.jpg",
                                 "name": "updated_lyme_data",
                                 "owner_id": 2,
                                 "parent_collection_id": 1,
-                                "visibility": "hidden"
+                                "visibility": "hidden",
+                                "overwrite": true
                             },
-                            "required": ["id"]
+                            "required": [
+                                "id"
+                            ]
                         }
                     }
                 ],
@@ -2832,7 +2942,7 @@
                         "description": "**permission denied** returns an error if collection does not have permission to update collection",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2846,7 +2956,7 @@
                         "description": "**failed operation** returns an error if exception arises while updating collection",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2866,7 +2976,7 @@
                 ]
             }
         },
-        "/collection/{collection_id}":{
+        "/collection/{collection_id}": {
             "delete": {
                 "tags": [
                     "collection"
@@ -2924,7 +3034,7 @@
                         "description": "**permission denied** returns an error if collection does not have permission to delete collection",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -2938,7 +3048,7 @@
                         "description": "**failed operation** returns an error if exception arises during collection deletion",
                         "schema": {
                             "type": "object",
-                            "properties":{
+                            "properties": {
                                 "message": {
                                     "type": "string"
                                 }
@@ -3067,7 +3177,7 @@
                     "$ref": "#/definitions/PolicyList"
                 }
             },
-            "example":{
+            "example": {
                 "id": 1,
                 "name": "admin"
             }
