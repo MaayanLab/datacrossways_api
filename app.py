@@ -858,7 +858,6 @@ def get_news():
     }
     response = requests.get(url, headers=headers)
 
-    
     if response.status_code == 200:
         return response.json(), 200
     else:
@@ -870,7 +869,7 @@ def login():
     redirect_endpoint = request.args.get('redirect_endpoint', None)
     google = oauth.create_client('google')  # create the google oauth client
     #redirect_uri = url_for('authorize', provider="google", _external=True)
-    redirect_uri = conf["redirect"]+"/api/user/authorize?provider=google"
+    redirect_uri = conf["redirect"]["url"]+"/api/user/authorize?provider=google"
     if redirect_endpoint != None:
         session['redirect_endpoint'] = redirect_endpoint
     return google.authorize_redirect(redirect_uri)
@@ -880,7 +879,7 @@ def login_orcid():
     redirect_endpoint = request.args.get('redirect_endpoint', None)
     orcid = oauth.create_client('orcid')  # create the orcid oauth client
     #redirect_uri = url_for('authorize', provider="orcid", _external=True)
-    redirect_uri = conf["redirect"]+"/api/user/authorize?provider=orcid"
+    redirect_uri = conf["redirect"]["url"]+"/api/user/authorize?provider=orcid"
     if redirect_endpoint != None:
         session['redirect_endpoint'] = redirect_endpoint
     return orcid.authorize_redirect(redirect_uri)
