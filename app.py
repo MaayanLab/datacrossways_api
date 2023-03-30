@@ -649,7 +649,7 @@ def get_collections():
 @accesskey_login
 @dev_login
 @login_required
-def get_collection_id(collection_id):
+def get_collection_by_id(collection_id):
     try:
         user = dict(session).get('user', None)
         collection = dbutils.get_collection(collection_id, user["id"])
