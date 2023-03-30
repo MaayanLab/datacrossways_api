@@ -40,7 +40,7 @@ def read_config():
     return json.load(f)
 
 app = Flask(__name__, 
-        static_url_path='/static',
+        static_url_path='/api/static',
         static_folder='static',
         template_folder='templates')
 
@@ -67,7 +67,7 @@ print(f"Current pool size: {pool_size}")
 
 ### swagger specific ###
 SWAGGER_URL = '/api/docs'
-API_URL = '/static/swagger.json'
+API_URL = '/api/static/swagger.json'
 SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
     SWAGGER_URL,
     API_URL,
