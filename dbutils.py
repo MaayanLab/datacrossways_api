@@ -97,9 +97,9 @@ def create_users_bulk(user_info):
                 u.pop("uuid", [])
                 print(u)
                 user = User(**u)
+                user.roles = roles
                 db.session.add(user)
                 db.session.commit()
-                user.roles = roles
                 db.session.refresh(user)
                 user_success.append(print_user(user))
             except Exception:
