@@ -813,7 +813,7 @@ def search_collection():
         limit = int(data.get("limit", 20))
         search = data.get("search", None)
         collections, collection_count = dbutils.search_collection(search, offset, limit)
-        return jsonify({"message": "collections searched successfully", "files": collections, "total": collection_count})
+        return jsonify({"message": "collections searched successfully", "collections": collections, "total": collection_count})
     except Exception:
         return jsonify(message="An error occurred when searching collections"), 500
 
@@ -828,7 +828,7 @@ def search_role():
         limit = int(data.get("limit", 20))
         search = data.get("search", None)
         roles, role_count = dbutils.search_role(search, offset, limit)
-        return jsonify({"message": "roles searched successfully", "files": roles, "total": role_count})
+        return jsonify({"message": "roles searched successfully", "roles": roles, "total": role_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when searching roles"), 500
@@ -844,7 +844,7 @@ def search_policy():
         limit = int(data.get("limit", 20))
         search = data.get("search", None)
         policies, policy_count = dbutils.search_policy(search, offset, limit)
-        return jsonify({"message": "policies searched successfully", "files": policies, "total": policy_count})
+        return jsonify({"message": "policies searched successfully", "policies": policies, "total": policy_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when searching policies"), 500
