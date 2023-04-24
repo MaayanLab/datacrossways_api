@@ -798,7 +798,7 @@ def search_user():
         limit = int(data.get("limit", 20))
         search = data.get("search", None)
         users, user_count = dbutils.search_user(search, offset, limit)
-        return jsonify({"message": "users searched successfully", "files": users, "total": user_count})
+        return jsonify({"message": "users searched successfully", "users": users, "total": user_count})
     except Exception:
         return jsonify(message="An error occurred when searching user"), 500
 
