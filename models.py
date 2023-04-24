@@ -141,6 +141,7 @@ class Role(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(200), unique=True, index=True)
     description = db.Column(db.String(2000))
+    creation_date = db.Column(db.DateTime, default=datetime.now)
     policies = db.relationship('Policy', secondary='role_policy', cascade='all, delete')
     def __repr__(self):
         return f"{self.id}-{self.name}"

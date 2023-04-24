@@ -159,6 +159,10 @@ def print_collection_short(collection):
     col["uuid"] = collection.uuid
     col["name"] = collection.name
     col["description"] = collection.description
+    col["files"] = len(collection.files)
+    col["collections"] = len(collection.collections)
+    col["visibility"] = collection.visibility
+    col["accessibility"] = collection.accessibility
     return col
 
 def search_role(search, offset, limit):
@@ -178,7 +182,8 @@ def print_roles_short(role):
     rol["id"] = role.id
     rol["name"] = role.name
     rol["description"] = role.description
-    rol["policies"] = [x.id for x in role.policies]
+    rol["policies"] = [{"id":x.id, "name":x.name} for x in role.policies]
+    rol["creation_date"] = role.creation_date
     return rol
 
 def list_user_quota(user_id):
@@ -483,7 +488,8 @@ def print_user_short(user):
     ushort["name"] = user.name
     ushort["email"] = user.email
     ushort["affiliation"] = user.affiliation
-    ushort["email"] = user.email
+    ushort["creation_date"] = user.creation_date
+    ushort["roles"] = [{"id":x.id, "name":x.name} for x in user.roles]
     return ushort
 
 def print_file():
