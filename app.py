@@ -263,7 +263,7 @@ def get_file_detail():
         offset = int(request.args.get("offset", default=0))
         limit = int(request.args.get("limit", default=20))
         files, file_count = dbutils.list_files_detail(offset, limit)
-        return jsonify({"message": "files listed successfully", "files": files, "total_files": file_count})
+        return jsonify({"message": "files listed successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
