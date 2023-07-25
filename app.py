@@ -82,26 +82,29 @@ app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_URL)
 
 #oauth config
 oauth = OAuth(app)
-oauth.register(
-    name = "google",
-    client_id = conf["oauth"]["google"]["client_id"],
-    client_secret = conf["oauth"]["google"]["client_secret"],
-    access_token_url = conf["oauth"]["google"]["token_uri"],
-    authorize_url = conf["oauth"]["google"]["auth_uri"],
-    api_base_url = 'https://www.googleapis.com/oauth2/v1/',
-    client_kwargs={'scope': 'openid email profile'}
-)
 
-oauth.register(
-    name = "orcid",
-    client_id = conf["oauth"]["orcid"]["client_id"],
-    client_secret = conf["oauth"]["orcid"]["client_secret"],
-    base_url='https://pub.orcid.org/v3.0/',
-    request_token_url=None,
-    access_token_url='https://orcid.org/oauth/token',
-    authorize_url='https://orcid.org/oauth/authorize',
-    client_kwargs={'scope': 'openid email profile'}
-)
+if "oauth" in conf and "google" in conf["oauth"]:
+    oauth.register(
+        name = "google",
+        client_id = conf["oauth"]["google"]["client_id"],
+        client_secret = conf["oauth"]["google"]["client_secret"],
+        access_token_url = conf["oauth"]["google"]["token_uri"],
+        authorize_url = conf["oauth"]["google"]["auth_uri"],
+        api_base_url = 'https://www.googleapis.com/oauth2/v1/',
+        client_kwargs={'scope': 'openid email profile'}
+    )
+
+if "oauth" in conf and "orcid" in conf["oauth"]:
+    oauth.register(
+        name = "orcid",
+        client_id = conf["oauth"]["orcid"]["client_id"],
+        client_secret = conf["oauth"]["orcid"]["client_secret"],
+        base_url='https://pub.orcid.org/v3.0/',
+        request_token_url=None,
+        access_token_url='https://orcid.org/oauth/token',
+        authorize_url='https://orcid.org/oauth/authorize',
+        client_kwargs={'scope': 'openid email profile'}
+    )
 
 @app.route('/api/stats', methods = ["GET"])
 @cache.cached(timeout=60)

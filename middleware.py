@@ -24,8 +24,6 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = dict(session).get('user', None)
-        # You would add a check here and usethe user id or something to fetch
-        # the other data for that user/check if they exist
         if user:
             return f(*args, **kwargs)
         return jsonify({'message': 'You are currently not logged in!'}), 401
