@@ -4,6 +4,7 @@ from flask import Flask, url_for, redirect, session, request, jsonify, Response
 import traceback
 import json
 import requests
+import time
 
 from authlib.integrations.flask_client import OAuth
 
@@ -55,7 +56,7 @@ cache = Cache(app, config={"CACHE_TYPE": "simple"})
 
 conf = read_config()
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"+conf["db"]["user"]+":"+conf["db"]["pass"]+"@"+conf["db"]["server"]+":"+conf["db"]["port"]+"/"+conf["db"]["name"]
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"+conf["database"]["user"]+":"+conf["database"]["pass"]+"@"+conf["database"]["server"]+":"+conf["database"]["port"]+"/"+conf["database"]["name"]
 app.config['SQLALCHEMY_POOL_SIZE'] = 40
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -238,6 +239,7 @@ def delete_user(user_id):
 # - file [POST]-> create a new file
 # - file [PATCH] -> update file
 # - file [DELETE] -> delete file
+
 @app.route('/api/file', methods = ["GET"])
 @accesskey_login
 @dev_login
@@ -272,7 +274,6 @@ def get_file_detail():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def search_file():
     try:
         data = request.get_json()
@@ -282,7 +283,6 @@ def search_file():
         owner_id = data.get("owner_id", None)
         collection_id = data.get("collection_id", None)
         collection_id = int(collection_id) if collection_id else None
-        import time
         tt = time.time()
         files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, fileinfo, owner_id, offset, limit)
         print("all:", time.time()-tt)
@@ -850,7 +850,7 @@ def search_policy():
         return jsonify(message="An error occurred when searching policies"), 500
 
 @app.route('/api/news', methods=["GET"])
-@cache.cached(timeout=60)
+@cache.cached(timeout=360)
 def get_news():
     url = "https://api.twitter.com/2/users/"+str(conf["social"]["twitter"]["account_id"])+"/tweets?tweet.fields=created_at,public_metrics"
     headers = {
