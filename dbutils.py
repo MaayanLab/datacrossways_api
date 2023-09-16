@@ -399,7 +399,6 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if collection_id is not None:
         files = files.filter(File.collection_id == collection_id)
     else:
-        #files = filterjson(db.session.query(File), File.meta, data).all()
         files = filterjson(db.session.query(File), File.meta, data)
     
     if file_name is not None:

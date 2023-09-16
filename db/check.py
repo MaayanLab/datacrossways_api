@@ -10,10 +10,10 @@ def read_config():
 conf = read_config()
 
 conn = psycopg2.connect(
-        host=conf["db"]["server"],
-        database=conf["db"]["name"],
-        user=conf["db"]["user"],
-        password=conf["db"]["pass"])
+        host=conf["database"]["server"],
+        database=conf["database"]["name"],
+        user=conf["database"]["user"],
+        password=conf["database"]["pass"])
 
 cursor = conn.cursor()
 
@@ -22,12 +22,10 @@ def print_table(table_name):
     cursor.execute(sql)
     conn.commit()
     results = cursor.fetchall()
-
     widths = []
     columns = []
     tavnit = '|'
     separator = '+' 
-
     counter = 0
     for cd in cursor.description:
         maxv = len(cd[0])
@@ -36,11 +34,9 @@ def print_table(table_name):
         widths.append(maxv)
         counter = counter+1
         columns.append(cd[0])
-
     for w in widths:
         tavnit += " %-"+"%ss |" % (w,)
         separator += '-'*w + '--+'
-
     print(separator)
     print(tavnit % tuple(columns))
     print(separator)

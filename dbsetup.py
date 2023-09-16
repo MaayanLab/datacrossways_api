@@ -126,3 +126,4 @@ db.session.add_all([])
 db.session.commit()
 
 
+db.session.add(user_1)
