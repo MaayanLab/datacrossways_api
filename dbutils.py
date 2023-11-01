@@ -5,10 +5,35 @@ import jsonschema
 from jsonschema import validate
 import s3utils
 from datetime import datetime
+from sqlalchemy.orm import joinedload
 from sqlalchemy.types import Integer, Float
+from sqlalchemy import func
 import time
 from sqlalchemy import or_, update
+import time
+from itertools import chain
+from functools import lru_cache
+import functools
 
+class TimedCache(object):
+    def __init__(self, timeout=1):
+        self.timeout = timeout
+        self.cache = {}
+        self.timers = {}
+
+    def __call__(self, f):
+        @functools.wraps(f)
+        def wrap(*args, **kwargs):
+            now = time.time()
+            if args not in self.cache or now - self.timers[args] > self.timeout:
+                result = f(*args, **kwargs)
+                self.cache[args] = result
+                self.timers[args] = now
+                return result
+            return self.cache[args]
+        return wrap
+
+@TimedCache(timeout=60)
 def is_admin(user_id):
     user_roles = get_user_roles(user_id)
     for r in user_roles:
@@ -16,6 +41,7 @@ def is_admin(user_id):
             return True
     return False
 
+@TimedCache(timeout=60)
 def is_uploader(user_id):
     user_roles = get_user_roles(user_id)
     for r in user_roles:
@@ -186,7 +212,7 @@ def print_roles_short(role):
     rol["creation_date"] = role.creation_date
     return rol
 
-def list_user_quota(user_id):
+def list_user_quota_2(user_id):
     db_user = db.session.query(User).filter(User.id == user_id).first()
     db_files = db.session.query(File).filter(File.owner_id == user_id).all()
     quota_used = 0
@@ -194,6 +220,14 @@ def list_user_quota(user_id):
         quota_used = quota_used+file.size
     quota_used = quota_used/(1024*1024)
     return((int(quota_used), int(max(0, db_user.storage_quota - quota_used)), int(db_user.storage_quota)))
+
+def list_user_quota(user_id):
+    db_user = db.session.query(User).filter(User.id == user_id).first()
+    if db_user:
+        total_size = db.session.query(func.sum(File.size)).filter(File.owner_id == user_id).scalar() or 0
+        quota_used = total_size / (1024 * 1024)
+        return (int(quota_used), int(max(0, db_user.storage_quota - quota_used)), int(db_user.storage_quota))
+    return (0, 0, 0)
 
 def update_user(user):
     dbuser = db.session.query(User).filter(User.id == user["id"]).first()
@@ -333,6 +367,22 @@ def create_file(db, file_name, file_size, user_id):
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
 
+def download_file(file_id, user_id):
+
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
+    files = db.session.query(File).filter(File.id == file_id)
+    files = files.join(Collection, File.collection_id == Collection.id).filter(
+            or_(
+                File.collection_id.in_(read_creds),
+                File.id.in_(read_creds),
+                File.accessibility != "locked",
+                File.owner_id == user_id,
+                Collection.accessibility == "open"
+            )
+    )
+
+    return files.first()
+
 def delete_file(file_id, user):
     if is_admin(user["id"]) or is_owner_file(user["id"], file_id):
         file = File.query.filter_by(id=file_id).first()
@@ -343,17 +393,49 @@ def delete_file(file_id, user):
     else:
         return 0
 
-def list_files(offset, limit):
-    db_files = db.session.query(File, User.name).filter(File.owner_id == User.id).order_by(File.id).offset(offset).limit(limit).all()
-    file_count = db.session.query(File.id).filter(File.owner_id == User.id).count()
+def list_files(offset, limit, user_id):
+    st = time.time()
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
+    
+    db_query = db.session.query(File, User.name).filter(
+        or_(
+            File.collection_id.in_(list_creds),
+            File.id.in_(list_creds),
+            File.visibility != "hidden",
+            File.owner_id == user_id
+        )
+    ).filter(
+        File.owner_id == User.id
+    )
+    
+    db_files = db_query.order_by(File.id).offset(offset).limit(limit).all()
+    
+    file_count = db_query.count()
     files = []
     for file in db_files:
         files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id, 'size': file[0].size})
+    print("elapsed:", time.time()-st)
     return files, file_count
 
-def list_files_detail(offset, limit):
-    db_files = db.session.query(File, User, Collection).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).order_by(File.id).offset(offset).limit(limit).all()
-    file_count = db.session.query(File.id).filter(File.owner_id == User.id).count()
+def list_files_detail(offset, limit, user_id=None):
+    
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
+    
+    db_query = db.session.query(File, User.name).filter(
+        or_(
+            File.collection_id.in_(list_creds),
+            File.id.in_(list_creds),
+            File.visibility != "hidden",
+            File.owner_id == user_id
+        )
+    ).filter(
+        File.owner_id == User.id
+    )
+    
+    db_files = db_query.order_by(File.id).offset(offset).limit(limit).all()
+    
+    file_count = db_query.count()
+
     files = []
     for file in db_files:
         owner = file[1]
@@ -369,6 +451,7 @@ def list_user_files(user_id, offset, limit):
     file_count = db.session.query(File).filter(File.owner_id == user_id).count()
     #db_files = File.query.filter_by(owner_id=user_id).order_by(File.id).offset(offset).limit(limit).all()
     db_files = db.session.query(File, User, Collection).filter(File.owner_id == user_id).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).order_by(File.id).offset(offset).limit(limit).all()
+    
     files = []
     for file in db_files:
         owner = file[1]
@@ -391,15 +474,16 @@ def list_collection_files(user_id):
     return []
 
 def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
-    (list_creds, read_creds, write_creds) = get_scope(user_id)
-
+    
     tt = time.time()
+
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
 
     files = db.session.query(File)
     if collection_id is not None:
         files = files.filter(File.collection_id == collection_id)
-    else:
-        files = filterjson(db.session.query(File), File.meta, data)
+    #else:
+    #    files = filterjson(db.session.query(File), File.meta, data)
     
     if file_name is not None:
         files = files.filter(or_(File.display_name.ilike("%{}%".format(file_name)), File.description.ilike("%{}%".format(file_name))))
@@ -407,32 +491,45 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if owner_id is not None:
         files = files.filter(File.owner_id == owner_id)
     
-    files = filterjson(files, File.meta, data)
+    if not is_admin(user_id):
+        files = files.filter(
+            or_(
+                File.collection_id.in_(list_creds),
+                File.id.in_(list_creds),
+                File.visibility != "hidden",
+                File.owner_id == user_id
+            )
+        )
 
-    print(time.time()-tt)
+    if data != "":
+        files = filterjson(files, File.meta, data)
+
+    files = files.offset(offset).limit(limit)
+
+    print("new all", time.time()-tt)
     
     res_files = []
     tt = time.time()
-    check_admin = is_admin(user_id)
     for file in files:
-        if file.uuid in list_creds or file.visibility == "visible" or check_admin:
+        if is_admin(user_id):
+            permissions = ["list", "read", "write"]
+        else:
             permissions = ["list"]
             if file.uuid in read_creds:
                 permissions.append("read")
             if file.uuid in write_creds:
                 permissions.append("write")
-            f = dict(file.__dict__)
-            f.pop('_sa_instance_state', None)
-            res_files.append(f)
-    #print(len(res_files))
-    print(time.time()-tt)
+        f = dict(file.__dict__)
+        f.pop('_sa_instance_state', None)
+        res_files.append(f)
+
+    print("t2", time.time()-tt)
     tt = time.time()
-    res_files_page = res_files[offset:(offset+limit)]
-    rr = add_file_detail(res_files_page)
-    print(time.time()-tt)
+    rr = add_file_detail(res_files)
+    print("tt3", time.time()-tt)
     return rr, len(res_files)
 
-def add_file_detail(files):
+def add_file_detail2(files):
     for file in files:
         file_details = db.session.query(File, User, Collection).filter(File.id == file["id"]).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).first()
         owner = {"id": file_details[1].id, "first_name": file_details[1].first_name, "last_name": file_details[1].last_name}
@@ -445,6 +542,28 @@ def add_file_detail(files):
         
         file["owner"] = owner
         file["collection"] = collection
+    return files
+
+def add_file_detail(files):
+    file_ids = [file['id'] for file in files]
+    
+    # Getting all file details including related user and collection info in a single query
+    file_details = db.session.query(File, User, Collection)\
+                             .filter(File.id.in_(file_ids))\
+                             .join(User, File.owner_id == User.id)\
+                             .join(Collection, File.collection_id == Collection.id)\
+                             .all()
+
+    file_details_dict = {f.id: {"owner": {"id": u.id, "first_name": u.first_name, "last_name": u.last_name},
+                                "collection": {"id": c.id, "name": c.name}} 
+                        for f, u, c in file_details}
+
+    for file in files:
+        file_detail = file_details_dict.get(file["id"])
+        if file_detail:
+            file["owner"] = file_detail["owner"]
+            file["collection"] = file_detail["collection"] 
+
     return files
 
 def list_users():
@@ -494,50 +613,77 @@ def print_user_short(user):
 def print_file():
     return({})
 
-def print_collection(collection):
-    collections = [c.id for c in collection.collections]
-    files = [f.id for f in collection.files]
-    collection = dict(collection.__dict__)
-    collection.pop('_sa_instance_state', None)
-    collection["collections"] = collections
-    collection["files"] = files
-    return(collection)
+def print_collection(collection, scope=None, admin=False, user_id=-1):
+    if admin:
+        return {
+            **{k: v for k, v in collection.__dict__.items() if k != '_sa_instance_state'},
+            "collections": [c.id for c in collection.collections],
+            "files": [f.id for f in collection.files]
+        }
+    elif scope:
+        return {
+            **{k: v for k, v in collection.__dict__.items() if k != '_sa_instance_state'},
+            "collections": [c.id for c in collection.collections if (not c.visibility == "hidden" or c.id in scope or c.owner_id == user_id) or admin],
+            "files": [f.id for f in collection.files if (not f.visibility == "hidden" or f.id in scope or f.owner_id == user_id) or admin]
+        }
+    else:
+        return {
+            **{k: v for k, v in collection.__dict__.items() if k != '_sa_instance_state'},
+            "collections": [c.id for c in collection.collections],
+            "files": [f.id for f in collection.files]
+        }
 
-def get_scope(userid):
+def get_scope_empty(userid):
     read_cred = []
     write_cred = []
     list_cred = []
     return (set(list_cred), set(read_cred), set(write_cred))
+    
 
 def get_scope2(userid):
-    read_cred = []
-    write_cred = []
-    list_cred = []
-    roles = []
-    for u, ur, r in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(Role.id == UserRole.role_id).filter(User.id == userid).all():
-        roles.append(r)
+    read_cred, write_cred, list_cred = set(), set(), set()
+
+    roles = db.session.query(Role).join(UserRole).filter(UserRole.user_id == userid).all()
+
+    for r in roles:
         for p in r.policies:
             if p.effect == "allow":
                 for c in p.collections:
                     add_collection_scope(c, p.action, list_cred, read_cred, write_cred)
-    return (set(list_cred), set(read_cred), set(write_cred))
+
+    return (list_cred, read_cred, write_cred)
+
+@TimedCache(timeout=30)
+def get_scope(userid):
+    read_cred, write_cred, list_cred = set(), set(), set()
+
+    roles = db.session.query(Role) \
+                      .options(joinedload(Role.policies).
+                               joinedload(Policy.collections).
+                               joinedload(Collection.collections)) \
+                      .join(UserRole).filter(UserRole.user_id == userid).all()
+
+    for r in roles:
+        for p in r.policies:
+            if p.effect == "allow":
+                for c in p.collections:
+                    add_collection_scope(c, p.action, list_cred, read_cred, write_cred)
+
+    return list_cred, read_cred, write_cred
 
 def add_collection_scope(collection, action, list_cred, read_cred, write_cred):
-    for f in collection.files:
-        if action == "list":
-            list_cred.append(f.uuid)
-        elif action == "write":
-            write_cred.append(f.uuid)
-        elif action == "read":
-            read_cred.append(f.uuid)
     for c in collection.collections:
-        add_collection_scope(c, action, list_cred, read_cred, write_cred)
+        not_in = not (c.id in list_cred or c.id in read_cred or c.id in write_cred)
         if action == "list":
-            list_cred.append(c.uuid)
+            list_cred.add(c.id)
         elif action == "write":
-            write_cred.append(c.uuid)
+            write_cred.add(c.id)
         elif action == "read":
-            read_cred.append(c.uuid)
+            read_cred.add(c.id)
+        if not_in:
+            add_collection_scope(c, action, list_cred, read_cred, write_cred)
+
+
 
 def append_role(user_id, role_name):
     user = db.session.query(User).filter(User.id == user_id).first()
@@ -545,14 +691,20 @@ def append_role(user_id, role_name):
     user.roles.append(role)
     db.session.commit()
 
-def list_collections():
-    db_collections = Collection.query.all()
-    
-    #db_collections = Collection.query.order_by(Collection.id).all()
-    collections = []
-    for collection in db_collections:
-        collections.append(print_collection(collection))
-    return collections
+@TimedCache(timeout=30)
+def list_collections(user_id):
+    st = time.time()
+    list_creds, read_creds, write_creds = get_scope(user_id)
+    is_user_admin = is_admin(user_id)
+    is_user_admin = False
+    if is_user_admin:
+        db_collections = Collection.query.all()
+    else:
+        db_collections = Collection.query.filter(or_(Collection.id.in_(list_creds), 
+                                             Collection.visibility != "hidden", 
+                                             Collection.owner_id == user_id)).all()
+    print("collection time", time.time()-st)
+    return [print_collection(collection, list_creds, is_user_admin, user_id) for collection in db_collections]
 
 def create_collection(collection, user_id):
     collection.pop("collections", None)
@@ -571,77 +723,137 @@ def create_collection(collection, user_id):
     db.session.refresh(dbcollection)
     return(print_collection(dbcollection))
 
-def update_collection(collection):
+def update_collection(collection, user_id):
     dbcollection = db.session.query(Collection).filter(Collection.id == collection["id"]).first()
-    dbroot = db.session.query(Collection).filter(Collection.id == 1).first()
-    collection.pop("creation_date", None)
-    collection.pop("uuid", None)
-    collection.pop("id", None)
-    collections = collection.pop("collections", [])
-    parent_path = get_parent_collection_path(dbcollection.id)
-    for cid in collections:
-        if cid in [x["id"] for x in parent_path]:
-            raise Exception("Invalid child, child collection is also parent (circular collection path).")
-    files = collection.pop("files", [])
-    overwrite = collection.pop("overwrite", False)
+    if dbcollection.owner_id == user_id or is_admin():
+        #dbroot = db.session.query(Collection).filter(Collection.id == 1).first()
+        collection.pop("creation_date", None)
+        collection.pop("uuid", None)
+        collection.pop("id", None)
+        collections = collection.pop("collections", [])
+        parent_path = get_parent_collection_path(dbcollection.id)
+        for cid in collections:
+            if cid in [x["id"] for x in parent_path]:
+                raise Exception("Invalid child, child collection is also parent (circular collection path).")
+        files = collection.pop("files", [])
+        overwrite = collection.pop("overwrite", False)
 
-    if overwrite:
-        for c in dbcollection.collections:
-            if c.id not in collections:
-                c.parent_collection_id = 1
-        for f in dbcollection.files:
-            if f.id not in files:
-                f.collection_id = 1
+        if overwrite:
+            for c in dbcollection.collections:
+                if c.id not in collections:
+                    c.parent_collection_id = 1
+            for f in dbcollection.files:
+                if f.id not in files:
+                    f.collection_id = 1
+            db.session.commit()
+            db.session.refresh(dbcollection)
+            dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
+            dbcollection.files = db.session.query(File).filter(File.id.in_(files)).all()
+        else:
+            dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
+            dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
+
+        if "name" in collection:
+            dbcollection.name = collection["name"]
+        if "description" in collection:
+            dbcollection.description = collection["description"]
+        if "image_url" in collection:
+            dbcollection.image_url = collection["image_url"]
+        if "visibility" in collection:
+            dbcollection.visibility = collection["visibility"]
+        if "affiliation" in collection:
+            dbcollection.affiliation = collection["affiliation"]
+        if "owner_id" in collection:
+            dbcollection.owner_id = collection["owner_id"]
+        if "parent_collection_id" in collection:
+            if collection["parent_collection_id"] != dbcollection.id:
+                dbcollection.parent_collection_id = collection["parent_collection_id"]
+        if "visibility" in collection:
+            dbcollection.visibility = collection["visibility"]
+        if "accessibility" in collection:
+            dbcollection.accessibility = collection["accessibility"]
+        
         db.session.commit()
         db.session.refresh(dbcollection)
-        dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
-        dbcollection.files = db.session.query(File).filter(File.id.in_(files)).all()
+        return(print_collection(dbcollection))
     else:
-        dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
-        dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
+        raise Exception("not owner or admin of collection")
 
-    if "name" in collection:
-        dbcollection.name = collection["name"]
-    if "description" in collection:
-        dbcollection.description = collection["description"]
-    if "image_url" in collection:
-        dbcollection.image_url = collection["image_url"]
-    if "visibility" in collection:
-        dbcollection.visibility = collection["visibility"]
-    if "affiliation" in collection:
-        dbcollection.affiliation = collection["affiliation"]
-    if "owner_id" in collection:
-        dbcollection.owner_id = collection["owner_id"]
-    if "parent_collection_id" in collection:
-        if collection["parent_collection_id"] != dbcollection.id:
-            dbcollection.parent_collection_id = collection["parent_collection_id"]
-    if "visibility" in collection:
-        dbcollection.visibility = collection["visibility"]
-    if "accessibility" in collection:
-        dbcollection.accessibility = collection["accessibility"]
-    
-    db.session.commit()
-    db.session.refresh(dbcollection)
-    return(print_collection(dbcollection))
-
-def delete_collection(collection_id):
+def delete_collection(collection_id, user_id):
     if collection_id != 1:
         dbcollection = db.session.query(File).filter(File.collection_id == collection_id)
-        query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
-        db.session.execute(query)
-        db.session.commit()
-        query = update(Collection).where(Collection.parent_collection_id == collection_id).values(parent_collection_id=1)
-        db.session.execute(query)
-        db.session.commit()
-        dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
-        c = print_collection(dbcollection)
-        db.session.query(Collection).filter(Collection.id == collection_id).delete()
-        db.session.commit()
-        return(c)
+        if dbcollection.owner_id == user_id or is_admin():
+            query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
+            db.session.execute(query)
+            db.session.commit()
+            query = update(Collection).where(Collection.parent_collection_id == collection_id).values(parent_collection_id=1)
+            db.session.execute(query)
+            db.session.commit()
+            dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
+            c = print_collection(dbcollection)
+            db.session.query(Collection).filter(Collection.id == collection_id).delete()
+            db.session.commit()
+            return(c)
+        else:
+            raise Exception("needs to be oner of admin to delete collection")
     else:
         raise Exception("root collection cannot be deleted")
 
 def get_collection(collection_id, user_id):
+    list_creds, read_creds, write_creds = get_scope(user_id)
+    is_user_admin = is_admin(user_id)
+
+    query_result = db.session.query(Collection, User).filter(
+        Collection.id == collection_id,
+        User.id == Collection.owner_id
+    ).first()
+
+    if not query_result:
+        return None
+
+    collection, db_owner = query_result
+
+    owner = {
+        "id": db_owner.id,
+        "name": db_owner.name,
+        "firstname": db_owner.first_name,
+        "lastname": db_owner.last_name,
+        "affiliation": db_owner.affiliation
+    }
+
+    sub_collections = Collection.query.filter(
+        Collection.parent_collection_id == collection_id
+    ).order_by(Collection.id)
+    
+    sub_files = File.query.filter(
+        File.collection_id == collection_id
+    ).order_by(File.id)
+
+    child_collections = [
+        {"id": sc.id, "name": sc.name, "uuid": sc.uuid}
+        for sc in sub_collections
+        if sc.uuid in list_creds or sc.visibility == "visible" or is_user_admin
+    ]
+
+    return {
+        "id": collection.id,
+        "name": collection.name,
+        "description": collection.description,
+        "uuid": collection.uuid,
+        "parent_collection_id": collection.parent_collection_id,
+        "date": collection.creation_date,
+        "owner_id": collection.owner_id,
+        "owner": owner,
+        "image_url": collection.image_url,
+        "collections": sub_collections.count(),
+        "child_collections": child_collections,
+        "files": sub_files.count(),
+        "accessibility": collection.accessibility,
+        "visibility": collection.visibility,
+        "path": get_parent_collection_path(collection_id),
+    }
+
+def get_collection_old(collection_id, user_id):
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     #collection = Collection.query.filter(Collection.id==collection_id).first()
     query_result = db.session.query(Collection, User).filter(Collection.id==collection_id).filter(User.id == Collection.owner_id).first()
@@ -671,7 +883,66 @@ def get_collection(collection_id, user_id):
     collection_return["path"] = get_parent_collection_path(collection_id)
     return collection_return
 
+@TimedCache(timeout=10)
 def get_collection_files(collection_id, offset, limit, user_id):
+    
+    st = time.time()
+    list_creds, read_creds, write_creds = get_scope(user_id)
+    print("get scope", time.time()-st, list_creds)
+
+    st = time.time()
+    collection = Collection.query.get(collection_id)
+    print("get collection", time.time()-st)
+
+    is_user_admin = is_admin(user_id)
+    if collection is None or (collection.uuid not in list_creds and not is_user_admin):
+        return []
+
+    st = time.time()
+    if is_user_admin:
+        files_query = File.query.filter(
+            File.collection_id == collection_id,
+        ).offset(offset).limit(limit)
+    else:
+        files_query = File.query.filter(
+            File.collection_id == collection_id,
+            or_(File.collection_id.in_(list_creds), File.visibility == "visible"),
+        ).offset(offset).limit(limit)
+    print("get files", time.time()-st)
+
+    st = time.time()
+    total_files = files_query.count()
+    print("get count", time.time()-st)
+    
+    
+    st = time.time()
+    files = []
+    for file in files_query:
+        #if file.uuid in list_creds or file.visibility == "visible" or is_user_admin:
+        permissions = ["list"]
+
+        #if file.uuid in read_creds:
+        #    permissions.append("read")
+            
+        #if file.uuid in write_creds:
+        #    permissions.append("write")
+
+        temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, 
+                    "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, 
+                    "visibility": file.visibility, "accessibility": file.accessibility, 
+                    'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
+                    
+        files.append(temp_file)
+        #if len(files) > offset + limit:
+        #    print("break", len(files))
+        #    break
+    print("format files", time.time()-st)
+    print("--------------------")
+
+    #return {"files": files[offset:offset + limit], "total_files": total_files}
+    return {"files": files, "total_files": total_files}
+
+def get_collection_files_old(collection_id, offset, limit, user_id):
     import time
     st = time.time()
     (list_creds, read_creds, write_creds) = get_scope(user_id)
@@ -865,7 +1136,9 @@ def annotate_file(file_id, metadata):
     file.pop('_sa_instance_state', None)
     return(file)
 
-def meta_stat(meta, path, stat):
+
+
+def meta_stat2(meta, path, stat):
     for k in meta.keys():
         if str(type(meta[k])) == "<class 'sqlalchemy_json.track.TrackedList'>":
             x=1
@@ -886,11 +1159,12 @@ def meta_stat(meta, path, stat):
                 stat[p] = temp
     return stat
 
-def get_filters(user_id, filter_number_category=20, filter_number_option=10):
+@TimedCache(timeout=60)
+def get_filters2(user_id, filter_number_category=20, filter_number_option=10):
     files = File.query.all()
     return collect_meta_stats(files, filter_number_category=filter_number_category, filter_number_option=filter_number_option)
 
-def collect_meta_stats(files, filter_number_category=20, filter_number_option=10):
+def collect_meta_stats2(files, filter_number_category=20, filter_number_option=10):
     stat = {}
     filter_result = []
     for f in files:
@@ -910,6 +1184,57 @@ def collect_meta_stats(files, filter_number_category=20, filter_number_option=10
             if file_count >= filter_number_category:
                 filter_result.append({"category": s, "detail": temp_stat})
     return filter_result
+
+
+
+
+def meta_stat(meta, path, stat):
+    for k, v in meta.items():
+        value_type = type(v).__name__
+        if value_type == "TrackedList":
+            continue
+        elif value_type == "TrackedDict":
+            stat = meta_stat(v, path + "/" + k, stat)
+        else:
+            p = path + "/" + k
+            v = str(int(v)) if isinstance(v, float) else v
+            stat.setdefault(p, {}).setdefault(str(v), 0)
+            stat[p][str(v)] += 1
+    return stat
+
+@TimedCache(timeout=30)
+def get_filters(user_id, filter_number_category=20, filter_number_option=10):
+    (list_creds, read_creds, write_creds) = get_scope(user_id)
+    files = db.session.query(File)
+    
+    if not is_admin(user_id):
+        files = files.filter(
+            or_(
+                File.collection_id.in_(list_creds),
+                File.id.in_(list_creds),
+                File.visibility != "hidden",
+                File.owner_id == user_id
+            )
+        )
+    return collect_meta_stats(files, filter_number_category, filter_number_option)
+
+def collect_meta_stats(files, filter_number_category=20, filter_number_option=10):
+    stat = {}
+    for f in files:
+        if f.meta:
+            stat = meta_stat(f.meta, "", stat)
+
+    return [{"category": s, "detail": temp_stat} for s, temp_stat in (should_filter(s, stat, filter_number_option, filter_number_category) for s in stat)] if filter_number_option > 0 else stat
+
+def should_filter(s, stat, filter_number_option, filter_number_category):
+    file_count = 0
+    temp_stat = {}
+    for k, v in stat[s].items():
+        if v >= filter_number_option:
+            file_count += v
+            temp_stat[k] = v
+    return (s, temp_stat) if file_count >= filter_number_category else (s, {})
+
 
 def get_file_metadata(db, file_id, user_id):
     file = db.session.query(File).filter(File.id == file_id).first()

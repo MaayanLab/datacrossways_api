@@ -154,7 +154,9 @@ def get_user_files():
 @login_required
 def get_user_storage():
     try:
+        st = time.time()
         file_quota_used, file_quota_available, file_quota = dbutils.list_user_quota(session["user"]["id"])
+        print(time.time() - st)
         return jsonify({"file_quota_used": file_quota_used, "file_quota": file_quota, "file_quota_available": file_quota_available, "info": "quota in MB"}), 200
     except Exception:
         traceback.print_exc()
@@ -247,12 +249,12 @@ def delete_user(user_id):
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_file():
     try:
         offset = int(request.args.get("offset", default=0))
         limit = int(request.args.get("limit", default=20))
-        files, file_count = dbutils.list_files(offset, limit)
+        user = dict(session).get('user', None)
+        files, file_count = dbutils.list_files(offset, limit, user_id=user["id"])
         return jsonify({"message": "files listed successfully", "files": files, "total_files": file_count})
     except Exception:
         traceback.print_exc()
@@ -267,7 +269,8 @@ def get_file_detail():
     try:
         offset = int(request.args.get("offset", default=0))
         limit = int(request.args.get("limit", default=20))
-        files, file_count = dbutils.list_files_detail(offset, limit)
+        user = dict(session).get('user', None)
+        files, file_count = dbutils.list_files_detail(offset, limit, user_id=user["id"])
         return jsonify({"message": "files listed successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
@@ -287,7 +290,7 @@ def search_file():
         collection_id = data.get("collection_id", None)
         collection_id = int(collection_id) if collection_id else None
         tt = time.time()
-        files, file_count = dbutils.search_files(data.get("query"), session["user"]["id"], collection_id, fileinfo, owner_id, offset, limit)
+        files, file_count = dbutils.search_files(data.get("query", ""), session["user"]["id"], collection_id, fileinfo, owner_id, offset, limit)
         print("all:", time.time()-tt)
         return jsonify({"message": "files searched successfully", "files": files, "total": file_count})
     except Exception:
@@ -401,13 +404,10 @@ def delete_file(file_id):
 def download(fileid):
     try:
         user = dict(session).get('user', None)
-        if dbutils.is_owner_file(user["id"], fileid) or dbutils.is_admin(user["id"]):
-            db_file = dbutils.get_file(fileid)
-            #print(db_file)
-            response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
-            return jsonify({"message": "URL signed", "url": response}), 200
-        else:
-            return jsonify(message="No permission to download file"), 403
+        db_file = dbutils.download_file(fileid, user["id"])
+        response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
+        return jsonify({"message": "URL signed", "url": response}), 200
+
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to sign URL"), 500
@@ -421,10 +421,9 @@ def download_list(fileids):
         user = dict(session).get('user', None)
         url_list = []
         for fileid in fileids:
-            if dbutils.is_owner_file(user["id"], fileid) or dbutils.is_admin(user["id"]):
-                db_file = dbutils.get_file(fileid)
-                response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
-                url_list.append({"id": fileid, "url": response})
+            db_file = dbutils.download_file(fileid, user["id"])
+            response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
+            url_list.append({"id": fileid, "url": response})
         return jsonify(urls=url_list), 200
     except Exception:
         traceback.print_exc()
@@ -631,18 +630,18 @@ def delete_policy(policy_id):
 
 
 # Collection API endpoints
-# - user [GET] -> list all roles
-# - user [POST]-> create a new role
-# - user [PATCH] -> update role
-# - user [DELETE] -> delete role
+# - user [GET] -> list all collections
+# - user [POST]-> create a new collections
+# - user [PATCH] -> update collections
+# - user [DELETE] -> delete collections
 @app.route('/api/collection', methods = ["GET"])
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_collections():
     try:
-        collections = dbutils.list_collections()
+        user = dict(session).get('user', None)
+        collections = dbutils.list_collections(user["id"])
         return jsonify({"message": "collections listed successfully", "collections": collections})
     except Exception:
         traceback.print_exc()
@@ -665,7 +664,6 @@ def get_collection_by_id(collection_id):
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_collections_list(collection_ids):
     try:
         collections = []
@@ -713,7 +711,8 @@ def post_collection():
 def patch_collection():
     try:
         data = request.get_json()
-        collection = dbutils.update_collection(data)
+        user = dict(session).get('user', None)
+        collection = dbutils.update_collection(data, user["id"])
         return jsonify({"message": "collection updated successfully", "collection": collection})
     except Exception:
         traceback.print_exc()
@@ -725,8 +724,8 @@ def patch_collection():
 @login_required
 def delete_collection(collection_id):
     try:
-        print(collection_id)
-        collection = dbutils.delete_collection(collection_id)
+        user = dict(session).get('user', None)
+        collection = dbutils.delete_collection(collection_id, user["id"])
         return jsonify({"message": "collection deleted successfully", "collection": collection})
     except Exception:
         traceback.print_exc()
