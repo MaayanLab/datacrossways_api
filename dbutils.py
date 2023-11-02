@@ -20,17 +20,18 @@ class TimedCache(object):
         self.timeout = timeout
         self.cache = {}
         self.timers = {}
-
+    
     def __call__(self, f):
         @functools.wraps(f)
         def wrap(*args, **kwargs):
             now = time.time()
-            if args not in self.cache or now - self.timers[args] > self.timeout:
+            args_key = tuple(json.dumps(arg, sort_keys=True) if isinstance(arg, dict) else arg for arg in args)
+            if args_key not in self.cache or now - self.timers[args_key] > self.timeout:
                 result = f(*args, **kwargs)
-                self.cache[args] = result
-                self.timers[args] = now
+                self.cache[args_key] = result
+                self.timers[args_key] = now
                 return result
-            return self.cache[args]
+            return self.cache[args_key]
         return wrap
 
 @TimedCache(timeout=60)
