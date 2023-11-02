@@ -264,7 +264,6 @@ def get_file():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_file_detail():
     try:
         offset = int(request.args.get("offset", default=0))
@@ -301,7 +300,6 @@ def search_file():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_filters():
     try:
         filter_number_category = int(request.args.get("category_filter", default=20))
@@ -316,7 +314,6 @@ def get_filters():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def post_file():
     try:
         data = request.get_json()
@@ -330,7 +327,6 @@ def post_file():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def patch_file():
     try:
         file = request.get_json()
@@ -343,7 +339,6 @@ def patch_file():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_file_meta(file_id):
     try:
         metadata = dbutils.get_file_metadata(db, file_id, session["user"]["id"])
@@ -355,7 +350,6 @@ def get_file_meta(file_id):
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def get_file_meta_list(file_ids):
     try:
         metas = []
@@ -384,7 +378,6 @@ def get_file_by_id(file_id):
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def delete_file(file_id):
     try:
         user = dict(session).get('user', None)

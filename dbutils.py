@@ -473,6 +473,7 @@ def list_user_collections(user_id, offset, limit):
 def list_collection_files(user_id):
     return []
 
+@TimedCache(timeout=2)
 def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
     
     tt = time.time()
