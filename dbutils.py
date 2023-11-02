@@ -20,7 +20,7 @@ class TimedCache(object):
         self.timeout = timeout
         self.cache = {}
         self.timers = {}
-    
+
     def __call__(self, f):
         @functools.wraps(f)
         def wrap(*args, **kwargs):
@@ -698,13 +698,16 @@ def list_collections(user_id):
     st = time.time()
     list_creds, read_creds, write_creds = get_scope(user_id)
     is_user_admin = is_admin(user_id)
-    is_user_admin = False
     if is_user_admin:
         db_collections = Collection.query.all()
     else:
-        db_collections = Collection.query.filter(or_(Collection.id.in_(list_creds), 
-                                             Collection.visibility != "hidden", 
-                                             Collection.owner_id == user_id)).all()
+        db_collections = Collection.query.filter(
+            or_(
+                Collection.id.in_(list_creds), 
+                Collection.visibility != "hidden", 
+                Collection.owner_id == user_id
+            )).all()
+    
     print("collection time", time.time()-st)
     return [print_collection(collection, list_creds, is_user_admin, user_id) for collection in db_collections]
 
