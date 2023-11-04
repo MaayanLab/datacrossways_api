@@ -80,7 +80,7 @@ def get_user_by_id_json(id):
         role_list = []
         for role in db_user.roles:
             role_list.append({"id": role.id, "name": role.name, "description": role.description})
-        user = {"id": db_user.id, "name": db_user.name, "first_name": db_user.first_name, "last_name": db_user.last_name, "email": db_user.email, "affiliation": db_user.affiliation, "creation_date": db_user.creation_date, "uuid": db_user.uuid, "storage_quota": db_user.storage_quota, "roles": role_list}
+        user = {"id": db_user.id, "name": db_user.name, "first_name": db_user.first_name, "last_name": db_user.last_name, "email": db_user.email, "affiliation": db_user.affiliation, "creation_date": db_user.creation_date, "orcid_id": db_user.orcid_id, "uuid": db_user.uuid, "storage_quota": db_user.storage_quota, "roles": role_list}
     return user
 
 def get_user_by_id(id):
