@@ -215,11 +215,11 @@ def post_user_bulk():
 @accesskey_login
 @dev_login
 @login_required
-@admin_required
 def patch_user():
     try:
         user = request.get_json()
-        user = dbutils.update_user(user)
+        user_id = dict(session).get('user', None)["id"]
+        user = dbutils.update_user(user, user_id=user_id)
         return jsonify({"message": "user updated", "user": user}), 200
     except Exception:
         traceback.print_exc()

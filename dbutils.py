@@ -14,6 +14,7 @@ import time
 from itertools import chain
 from functools import lru_cache
 import functools
+import re
 
 class TimedCache(object):
     def __init__(self, timeout=1):
@@ -230,36 +231,48 @@ def list_user_quota(user_id):
         return (int(quota_used), int(max(0, db_user.storage_quota - quota_used)), int(db_user.storage_quota))
     return (0, 0, 0)
 
-def update_user(user):
-    dbuser = db.session.query(User).filter(User.id == user["id"]).first()
-    user.pop("creation_date", None)
-    user.pop("uuid", None)
-    user.pop("id", None)
-    overwrite = user.pop("overwrite", False)
-
-    roles = user.pop("roles", [])
-    
-    if overwrite:
-        dbuser.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
+def is_valid_email(email):
+    # Define a basic regex pattern for email validation
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    # Use the re.match() function to check if the email matches the pattern
+    if re.match(pattern, email):
+        return True
     else:
-        dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
+        return False
 
-    if "name" in user:
-        dbuser.name = user["name"]
-    if "first_name" in user:
-        dbuser.first_name = user["first_name"]
-    if "last_name" in user:
-        dbuser.last_name = user["last_name"]
-    if "email" in user:
-        dbuser.email = user["email"]
-    if "affiliation" in user:
-        dbuser.affiliation = user["affiliation"]
-    if "orcid_id" in user:
-        dbuser.orcid_id = user["orcid_id"]
+def update_user(user, user_id=None):
+    if user_id == user["id"] or is_admin(user_id):
+        dbuser = db.session.query(User).filter(User.id == user["id"]).first()
+        user.pop("creation_date", None)
+        user.pop("uuid", None)
+        user.pop("id", None)
+        overwrite = user.pop("overwrite", False)
 
-    db.session.commit()
+        roles = user.pop("roles", [])
+        
+        if overwrite:
+            dbuser.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
+        else:
+            dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
 
-    return(print_user(dbuser))
+        if "name" in user:
+            dbuser.name = user["name"]
+        if "first_name" in user:
+            dbuser.first_name = user["first_name"]
+        if "last_name" in user:
+            dbuser.last_name = user["last_name"]
+        if "email" in user and is_valid_email(user["email"]):
+            dbuser.email = user["email"] 
+        if "affiliation" in user:
+            dbuser.affiliation = user["affiliation"]
+        if "orcid_id" in user:
+            dbuser.orcid_id = user["orcid_id"]
+
+        db.session.commit()
+
+        return(print_user(dbuser))
+    else:
+        raise Exception("User not allowed to be modified")
 
 # ----------- roles ----------------
 
