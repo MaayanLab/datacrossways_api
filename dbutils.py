@@ -107,7 +107,7 @@ def get_user(db, user_info):
         if db_user:
             user = db_user
         else:
-            db_user = User(user_info["name"], user_info["given_name"], user_info["family_name"], user_info["email"])
+            db_user = User(user_info["name"], user_info["given_name"], user_info["last_name"], user_info["email"])
             db.session.add(db_user)
             db.session.commit()
             user = db.session.query(User).filter(User.email == user_info["email"]).first()
@@ -499,8 +499,6 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     files = db.session.query(File)
     if collection_id is not None:
         files = files.filter(File.collection_id == collection_id)
-    #else:
-    #    files = filterjson(db.session.query(File), File.meta, data)
     
     if file_name is not None:
         files = files.filter(or_(File.display_name.ilike("%{}%".format(file_name)), File.description.ilike("%{}%".format(file_name))))
@@ -523,8 +521,6 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
 
     files = files.offset(offset).limit(limit)
 
-    print("new all", time.time()-tt)
-    
     res_files = []
     tt = time.time()
     for file in files:
@@ -551,11 +547,6 @@ def add_file_detail2(files):
         file_details = db.session.query(File, User, Collection).filter(File.id == file["id"]).filter(File.owner_id == User.id).filter(File.collection_id == Collection.id).first()
         owner = {"id": file_details[1].id, "first_name": file_details[1].first_name, "last_name": file_details[1].last_name}
         collection = {"id": file_details[2].id, "name": file_details[2].name}
-        
-        #file_user = db.session.query(User).filter(User.id == file["owner_id"]).first()
-        #file_collection = db.session.query(Collection).filter(Collection.id == file["collection_id"]).first()
-        #owner = {"id": file_user.id, "first_name": file_user.first_name, "last_name": file_user.last_name}
-        #collection = {"id": file_collection.id, "name": file_collection.name}
         
         file["owner"] = owner
         file["collection"] = collection
@@ -938,14 +929,7 @@ def get_collection_files(collection_id, offset, limit, user_id):
     st = time.time()
     files = []
     for file in files_query:
-        #if file.uuid in list_creds or file.visibility == "visible" or is_user_admin:
         permissions = ["list"]
-
-        #if file.uuid in read_creds:
-        #    permissions.append("read")
-            
-        #if file.uuid in write_creds:
-        #    permissions.append("write")
 
         temp_file = {"id": file.id, "name": file.name, "display_name": file.display_name, "uuid": file.uuid, 
                     "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, 
@@ -953,13 +937,10 @@ def get_collection_files(collection_id, offset, limit, user_id):
                     'collection_id': file.collection_id, 'size': file.size, "permissions": permissions}
                     
         files.append(temp_file)
-        #if len(files) > offset + limit:
-        #    print("break", len(files))
-        #    break
+
     print("format files", time.time()-st)
     print("--------------------")
 
-    #return {"files": files[offset:offset + limit], "total_files": total_files}
     return {"files": files, "total_files": total_files}
 
 def get_collection_files_old(collection_id, offset, limit, user_id):
@@ -1204,9 +1185,6 @@ def collect_meta_stats2(files, filter_number_category=20, filter_number_option=1
             if file_count >= filter_number_category:
                 filter_result.append({"category": s, "detail": temp_stat})
     return filter_result
-
-
-
 
 def meta_stat(meta, path, stat):
     for k, v in meta.items():

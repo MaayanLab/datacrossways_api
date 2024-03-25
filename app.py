@@ -452,7 +452,7 @@ def upload():
         # check whether user has rights to upload data
         # general upload rights, resource write credentials (e.g. user is allowed to write)
         response = s3utils.sign_upload_file(db_file["uuid"]+"/"+data["filename"], conf["aws"])
-        dbutils.upload_complete_file
+        #dbutils.upload_complete_file
         return jsonify({"message": "URL signed", "url": response, "file": db_file}), 200
     except Exception:
         return jsonify(message="An error occurred when attempting to sign URL"), 500
@@ -495,7 +495,7 @@ def completemultipart():
     try:
         data = request.get_json()
         s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
-        return jsonify({'message': 'multipart upload completed'}), 200 
+        return jsonify({'message': 'multipart upload completed'}), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to complete multipart upload"), 500
@@ -898,6 +898,7 @@ def authorize():
         token = google.authorize_access_token()
         response = google.get('userinfo', token=token)
         user_info = response.json()
+        print(user_info)
     elif provider == "orcid":
         orcid = oauth.create_client("orcid")
         token = orcid.authorize_access_token()
