@@ -268,7 +268,8 @@ def update_user(user, user_id=None):
         if "affiliation" in user:
             dbuser.affiliation = user["affiliation"]
         if "orcid_id" in user:
-            dbuser.orcid_id = user["orcid_id"]
+            if len(user["orcid_id"]) > 0:
+                dbuser.orcid_id = user["orcid_id"]
 
         db.session.commit()
 
