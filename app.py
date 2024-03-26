@@ -907,7 +907,7 @@ def authorize():
         token = google.authorize_access_token()
         response = google.get('userinfo', token=token)
         user_info = response.json()
-        print(user_info)
+        print(user_info, flush=True)
     elif provider == "orcid":
         orcid = oauth.create_client("orcid")
         token = orcid.authorize_access_token()

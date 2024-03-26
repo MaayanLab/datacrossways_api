@@ -123,7 +123,6 @@ def create_users_bulk(user_info):
                 roles = db.session.query(Role).filter(Role.name.in_(roles)).all()
                 u.pop("id", [])
                 u.pop("uuid", [])
-                print(u)
                 user = User(**u)
                 user.roles = roles
                 db.session.add(user)
