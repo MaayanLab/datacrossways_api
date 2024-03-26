@@ -33,8 +33,17 @@ class IntListConverter(BaseConverter):
         return ','.join(str(x) for x in value)
 
 import logging
+import sys
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+# Get the 'werkzeug' logger specifically
 log = logging.getLogger('werkzeug')
-#log.setLevel(logging.ERROR)
+log.setLevel(logging.DEBUG)
+
+# Create a StreamHandler for stdout
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+log.addHandler(handler)
 
 def read_config():
     f = open('secrets/config.json')
