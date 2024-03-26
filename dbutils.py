@@ -107,7 +107,10 @@ def get_user(db, user_info):
         if db_user:
             user = db_user
         else:
-            db_user = User(user_info["name"], user_info["given_name"], user_info["last_name"], user_info["email"])
+            if "family_name" in user_info:
+                db_user = User(user_info["name"], user_info["given_name"], user_info["family_name"], user_info["email"])
+            else:
+                db_user = User(user_info["name"], user_info["given_name"], "", user_info["email"])
             db.session.add(db_user)
             db.session.commit()
             user = db.session.query(User).filter(User.email == user_info["email"]).first()
