@@ -34,7 +34,7 @@ class IntListConverter(BaseConverter):
 
 import logging
 log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+#log.setLevel(logging.ERROR)
 
 def read_config():
     f = open('secrets/config.json')
