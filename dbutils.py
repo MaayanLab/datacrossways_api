@@ -522,7 +522,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if data != "":
         files = filterjson(files, File.meta, data)
 
-    file_total = len(files)
+    file_total = files.count()
 
     files = files.offset(offset).limit(limit)
 
