@@ -522,6 +522,8 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     if data != "":
         files = filterjson(files, File.meta, data)
 
+    file_total = len(files)
+
     files = files.offset(offset).limit(limit)
 
     res_files = []
@@ -543,7 +545,7 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
     tt = time.time()
     rr = add_file_detail(res_files)
     print("tt3", time.time()-tt)
-    return rr, len(res_files)
+    return rr, file_total
 
 def add_file_detail2(files):
     for file in files:
@@ -795,7 +797,7 @@ def update_collection(collection, user_id):
 
 def delete_collection(collection_id, user_id):
     if collection_id != 1:
-        dbcollection = db.session.query(File).filter(File.collection_id == collection_id)
+        dbcollection = db.session.query(File).filter(File.collection_id == collection_id).first()
         if dbcollection.owner_id == user_id or is_admin():
             query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
             db.session.execute(query)
