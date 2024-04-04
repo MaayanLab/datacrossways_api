@@ -797,16 +797,16 @@ def update_collection(collection, user_id):
 
 def delete_collection(collection_id, user_id):
     if collection_id != 1:
-        dbcollection = db.session.query(File).filter(File.collection_id == collection_id).first()
-        if dbcollection.owner_id == user_id or is_admin():
+        db_collection = db.session.query(Collection).filter(Collection.id == collection_id).first()
+        if db_collection.owner_id == user_id or is_admin():
             query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
             db.session.execute(query)
             db.session.commit()
             query = update(Collection).where(Collection.parent_collection_id == collection_id).values(parent_collection_id=1)
             db.session.execute(query)
             db.session.commit()
-            dbcollection = db.session.query(Collection).filter(Collection.id == collection_id).first()
-            c = print_collection(dbcollection)
+            db_collection = db.session.query(Collection).filter(Collection.id == collection_id).first()
+            c = print_collection(db_collection)
             db.session.query(Collection).filter(Collection.id == collection_id).delete()
             db.session.commit()
             return(c)
