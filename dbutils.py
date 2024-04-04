@@ -377,7 +377,7 @@ def print_policy(policy):
 
 def create_file(db, file_name, file_size, user_id):
     user = db.session.query(User).filter(User.id == user_id).first()
-    file = File(name=file_name, user=user, size=file_size, collection_id=1)
+    file = File(name=file_name, user=user, size=file_size, collection_id=1, status="ready")
     db.session.add_all([file])
     db.session.commit()
     db.session.refresh(file)
