@@ -117,8 +117,8 @@ if "oauth" in conf and "orcid" in conf["oauth"]:
 def search_checksum():
     try:
         dbutils.file_checksum_status()
-    except Exception:
-        xx = 0
+    except Exception as e:
+        traceback.print_exc()
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
