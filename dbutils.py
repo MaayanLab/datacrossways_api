@@ -15,6 +15,7 @@ from itertools import chain
 from functools import lru_cache
 import functools
 import re
+from flask import current_app
 
 class TimedCache(object):
     def __init__(self, timeout=1):
@@ -1003,12 +1004,13 @@ def update_file(db, file):
     db.session.commit()
 
 def file_checksum_status():
-    db_files = db.session.query(File).filter(File.checksum == "").all()
-    for db_file in db_files:
-        checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
-        db_file.status = "ready"
-        db_file.checksum = checksum
-    db.session.commit()
+    with current_app.app_context():
+        db_files = db.session.query(File).filter(File.checksum == "").all()
+        for db_file in db_files:
+            checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
+            db_file.status = "ready"
+            db_file.checksum = checksum
+        db.session.commit()
 
 def list_policies():
     db_policies = db.session.query(Policy).order_by(Policy.id).all()

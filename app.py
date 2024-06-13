@@ -120,9 +120,10 @@ def search_checksum():
     except Exception as e:
         traceback.print_exc()
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
-scheduler.start()
+if __name__ == '__main__':
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
+    scheduler.start()
 
 @app.route('/api/stats', methods = ["GET"])
 @cache.cached(timeout=60)
