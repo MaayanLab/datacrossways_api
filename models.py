@@ -73,6 +73,7 @@ class File(db.Model):
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="locked")
     description = db.Column(db.String())
+    checksum = db.Column(db.String(), default="")
     creation_date = db.Column(db.DateTime, default=datetime.now)
     size = db.Column(db.Integer(), default=0)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id', onupdate='CASCADE'), index=True)

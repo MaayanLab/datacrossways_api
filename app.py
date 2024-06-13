@@ -1,10 +1,9 @@
-
-
 from flask import Flask, url_for, redirect, session, request, jsonify, Response
 import traceback
 import json
 import requests
 import time
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from authlib.integrations.flask_client import OAuth
 
@@ -114,6 +113,16 @@ if "oauth" in conf and "orcid" in conf["oauth"]:
         authorize_url='https://orcid.org/oauth/authorize',
         client_kwargs={'scope': 'openid email profile'}
     )
+
+def search_checksum():
+    try:
+        dbutils.file_checksum_status()
+    except Exception:
+        xx = 0
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
+scheduler.start()
 
 @app.route('/api/stats', methods = ["GET"])
 @cache.cached(timeout=60)
@@ -381,7 +390,6 @@ def get_file_by_id(file_id):
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to retrieve file"), 500
-
 
 @app.route('/api/file/<int:file_id>', methods = ["DELETE"])
 @accesskey_login

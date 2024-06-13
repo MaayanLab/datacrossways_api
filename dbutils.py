@@ -377,7 +377,7 @@ def print_policy(policy):
 
 def create_file(db, file_name, file_size, user_id):
     user = db.session.query(User).filter(User.id == user_id).first()
-    file = File(name=file_name, user=user, size=file_size, collection_id=1, status="ready")
+    file = File(name=file_name, user=user, size=file_size, collection_id=1, status="uploading")
     db.session.add_all([file])
     db.session.commit()
     db.session.refresh(file)
@@ -387,7 +387,6 @@ def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
 
 def download_file(file_id, user_id):
-
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     files = db.session.query(File).filter(File.id == file_id)
     files = files.join(Collection, File.collection_id == Collection.id).filter(
@@ -399,7 +398,6 @@ def download_file(file_id, user_id):
                 Collection.accessibility == "open"
             )
     )
-
     return files.first()
 
 def delete_file(file_id, user):
@@ -432,7 +430,7 @@ def list_files(offset, limit, user_id):
     file_count = db_query.count()
     files = []
     for file in db_files:
-        files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id, 'size': file[0].size})
+        files.append({"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner_id": file[0].owner_id, "owner_name": file[1], "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection_id': file[0].collection_id, 'size': file[0].size, 'checksum': file[0].checksum})
     print("elapsed:", time.time()-st)
     return files, file_count
 
@@ -1004,6 +1002,14 @@ def update_file(db, file):
 
     db.session.commit()
 
+def file_checksum_status(db):
+    db_files = db.session.query(File).filter(File.checksum == "").all()
+    for db_file in db_files:
+        checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
+        db_file.status = "ready"
+        db_file.checksum = checksum
+    db.session.commit()
+
 def list_policies():
     db_policies = db.session.query(Policy).order_by(Policy.id).all()
     policies = []
@@ -1249,5 +1255,5 @@ def get_file_by_id(file_id, user_id):
     collection = file[2]
     owner_result = {"first_name": owner.first_name, "last_name": owner.last_name, "id": owner.id, "uuid": owner.uuid}
     collection_result = {"id": collection.id, "name": collection.name, "uuid": collection.uuid}
-    file_result = {"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": owner_result, "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection': collection_result, 'size': file[0].size, 'meta': file[0].meta}
+    file_result = {"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": owner_result, "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection': collection_result, 'size': file[0].size, 'meta': file[0].meta, 'checksum': file[0].checksum}
     return file_result

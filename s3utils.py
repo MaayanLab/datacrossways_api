@@ -79,3 +79,8 @@ def get_file_size(filename):
     s3_client = get_aws_client(app.conf["aws"])
     response = s3_client.head_object(Bucket='mssm-test', Key='kWbmk5955QM7/kallisto')
     return response['ContentLength']
+
+def get_file_checksum(filename):
+    s3_client = get_aws_client(app.conf["aws"])
+    response = s3_client.head_object(Bucket=app.conf["aws"]["bucket"], Key=filename)
+    return response['Metadata'].get("checksum")

@@ -20,10 +20,12 @@ __py*
 
 # production
 /build
-
+test/*
 # misc
 .DS_Store
 *.pem
+
+env/*
 
 # debug
 npm-debug.log*
