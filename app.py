@@ -115,15 +115,16 @@ if "oauth" in conf and "orcid" in conf["oauth"]:
     )
 
 def search_checksum():
-    try:
-        dbutils.file_checksum_status()
-    except Exception as e:
-        traceback.print_exc()
+    with app.app_context():
+        try:
+            dbutils.file_checksum_status()
+        except Exception as e:
+            traceback.print_exc()
 
-if __name__ == '__main__':
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
-    scheduler.start()
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
+scheduler.start()
 
 @app.route('/api/stats', methods = ["GET"])
 @cache.cached(timeout=60)
