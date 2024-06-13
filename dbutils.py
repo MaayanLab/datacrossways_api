@@ -1002,7 +1002,7 @@ def update_file(db, file):
 
     db.session.commit()
 
-def file_checksum_status(db):
+def file_checksum_status():
     db_files = db.session.query(File).filter(File.checksum == "").all()
     for db_file in db_files:
         checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
