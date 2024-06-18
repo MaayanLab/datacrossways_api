@@ -1073,7 +1073,7 @@ def delete_access_key(user_id, key_id):
         return 0
 
 def get_key_user(user_key):
-    akey = db.session.query(Accesskey).filte(Accesskey.uuid == user_key).first()
+    akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
     user = db.session.query(User).filter(User.id == akey.owner_id).first()
     return user
 
