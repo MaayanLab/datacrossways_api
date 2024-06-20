@@ -172,16 +172,57 @@ def delete_user(user_id):
     return(r)
 
 def search_user(search, offset, limit):
-    users = db.session.query(User)
-    users = users.filter((User.first_name.ilike("%{}%".format(search))) | (User.last_name.ilike("%{}%".format(search))) | (User.affiliation.ilike("%{}%".format(search)))).all()
-    res_users = users[offset:(offset+limit)]
-    return ([print_user_short(x) for x in res_users], len(users))
+    # Ensure 'search' is safely escaped and avoid repetitive formatting
+    search_pattern = f"%{search}%"
 
-def search_collection(search, offset, limit):
-    collections = db.session.query(Collection)
-    collections = collections.filter((Collection.description.ilike("%{}%".format(search))) | (Collection.name.ilike("%{}%".format(search))) | (Collection.uuid.ilike("%{}%".format(search)))).all()
-    res_collections = collections[offset:(offset+limit)]
-    return ([print_collection_short(x) for x in res_collections], len(collections))
+    # Query the database with filters and apply offset/limit for efficiency
+    query = db.session.query(User).filter(
+        or_(User.first_name.ilike(search_pattern),
+            User.last_name.ilike(search_pattern),
+            User.affiliation.ilike(search_pattern))
+    )
+
+    total_users_count = query.count()
+    res_users = query.offset(offset).limit(limit).all()
+
+    return ([print_user_short(x) for x in res_users], total_users_count)
+
+def search_collection(search, offset, limit, user_id):
+    # Get user credentials and admin status
+    list_creds, read_creds, write_creds = get_scope(user_id)
+    is_user_admin = is_admin(user_id)
+    
+    # Construct the base query
+    if is_user_admin:
+        db_collections = Collection.query  # Admin can see all collections
+    else:
+        db_collections = Collection.query.filter(
+            or_(
+                Collection.id.in_(list_creds), 
+                Collection.visibility != "hidden", 
+                Collection.owner_id == user_id
+            )
+        )
+    
+    # Prepare the search pattern to prevent repetition and SQL injection
+    search_pattern = f"%{search}%"
+
+    # Apply filters for searching
+    db_collections = db_collections.filter(
+        or_(
+            Collection.description.ilike(search_pattern),
+            Collection.name.ilike(search_pattern),
+            Collection.uuid.ilike(search_pattern)
+        )
+    )
+    
+    # Get total count of matched collections
+    total_collections_count = db_collections.count()
+
+    # Apply offset and limit for fetching the required subset
+    res_collections = db_collections.offset(offset).limit(limit).all()
+
+    return ([print_collection_short(collection) for collection in res_collections], total_collections_count)
 
 def print_collection_short(collection):
     col = {}
@@ -251,11 +292,11 @@ def update_user(user, user_id=None):
         overwrite = user.pop("overwrite", False)
 
         roles = user.pop("roles", [])
-        
-        if overwrite:
-            dbuser.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
-        else:
-            dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
+        if is_admin(user_id):
+            if overwrite:
+                dbuser.roles = db.session.query(Role).filter(Role.id.in_(roles)).all()
+            else:
+                dbuser.roles = list(set(dbuser.roles + db.session.query(Role).filter(Role.id.in_(roles)).all()))
 
         if "name" in user:
             dbuser.name = user["name"]

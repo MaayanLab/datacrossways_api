@@ -1746,10 +1746,10 @@
         "/policy/search":{
             "post":{
                 "tags": [
-                    "user"
+                    "policy"
                 ],
-                "summary": "Create user",
-                "description": "Create new user.",
+                "summary": "Search policy",
+                "description": "Search policy.",
                 "parameters": [
                     {
                         "in": "body",
@@ -1758,7 +1758,7 @@
                         "required": true,
                         "schema": {
                             "user": {
-                                "$ref": "#/definitions/User"
+                                "$ref": "#/definitions/Policy"
                             },
                             "example": {
                                 "name": "Jane Doe",

@@ -806,6 +806,7 @@ def keylogin():
 @accesskey_login
 @dev_login
 @login_required
+@admin_required
 def search_user():
     try:
         data = request.get_json()
@@ -827,7 +828,8 @@ def search_collection():
         offset = int(data.get("offset", 0))
         limit = int(data.get("limit", 20))
         search = data.get("search", None)
-        collections, collection_count = dbutils.search_collection(search, offset, limit)
+        user = dict(session).get('user', None)
+        collections, collection_count = dbutils.search_collection(search, offset, limit, user["id"])
         return jsonify({"message": "collections searched successfully", "collections": collections, "total": collection_count})
     except Exception:
         return jsonify(message="An error occurred when searching collections"), 500
