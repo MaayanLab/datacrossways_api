@@ -540,8 +540,6 @@ def list_collection_files(user_id):
 @TimedCache(timeout=2)
 def search_files(query_data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
     
-    tt = time.time()
-
     (list_creds, read_creds, write_creds) = get_scope(user_id)
 
     files = db.session.query(File)
@@ -572,7 +570,6 @@ def search_files(query_data, user_id, collection_id, file_name, owner_id, offset
     files = files.offset(offset).limit(limit)
 
     res_files = []
-    tt = time.time()
     for file in files:
         if is_admin(user_id):
             permissions = ["list", "read", "write"]
@@ -586,10 +583,7 @@ def search_files(query_data, user_id, collection_id, file_name, owner_id, offset
         f.pop('_sa_instance_state', None)
         res_files.append(f)
 
-    print("t2", time.time()-tt)
-    tt = time.time()
     rr = add_file_detail(res_files)
-    print("tt3", time.time()-tt)
     return rr, file_total
 
 def add_file_detail2(files):
@@ -1164,7 +1158,7 @@ def validate_json(json_data, schema_data):
         return False
     return True
 
-def filterjson(filter, file, j):
+def filterjson_old(filter, file, j):
     jkeys = j.keys()
     for k in jkeys:
         if type(j[k]) == int:
@@ -1179,6 +1173,36 @@ def filterjson(filter, file, j):
             filter = filter.filter(file[k].astext == j[k])
         elif "between" in j[k].keys():
             filter = filter.filter(file[k].cast(Float) >= j[k]["between"][0]).filter(file[k].cast(Float) <= j[k]["between"][1])
+        else:
+            try:
+                filter = filterjson(filter, file[k], j[k])
+            except Exception:
+                traceback.print_exc()
+    return filter
+
+def filterjson(filter, file, j):
+    jkeys = j.keys()
+    for k in jkeys:
+        if isinstance(j[k], int):
+            filter = filter.filter(file[k].cast(Integer) == j[k])
+        elif isinstance(j[k], float):
+            filter = filter.filter(file[k].cast(Float) == j[k])
+        elif j[k] is None:
+            filter = filter.filter(file.has_key(k))
+        elif "%" in j[k]:
+            filter = filter.filter(file[k].astext.ilike(j[k]))
+        elif isinstance(j[k], str):
+            filter = filter.filter(file[k].astext == j[k])
+        elif "between" in j[k]:
+            filter = filter.filter(file[k].cast(Float) >= j[k]["between"][0]).filter(file[k].cast(Float) <= j[k]["between"][1])
+        elif isinstance(j[k], list) and all(isinstance(i, dict) for i in j[k]):
+            # Handle lists of dictionaries
+            subfilters = []
+            for item in j[k]:
+                subfilter = filter
+                subfilter = filterjson(subfilter, file[k], item)
+                subfilters.append(subfilter)
+            filter = filter.filter(or_(*subfilters))
         else:
             try:
                 filter = filterjson(filter, file[k], j[k])
