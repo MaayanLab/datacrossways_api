@@ -1195,13 +1195,16 @@ def filterjson(files, file_meta, query):
             for item in query[k]:
                 if isinstance(item, dict):
                     # Create a condition for each item in the array
-                    item_condition = func.jsonb_path_exists(
-                        file_meta[k],
-                        f'$[*] ? (' + ' && '.join([f'@.{sub_k} == {repr(sub_v)}' for sub_k, sub_v in item.items()]) + ')'
-                    )
-                    array_conditions.append(item_condition)
+                    item_conditions = [
+                        func.jsonb_path_exists(
+                            file_meta[k],
+                            f'$[*] ? (@.{sub_k} == {repr(sub_v)})'
+                        )
+                        for sub_k, sub_v in item.items()
+                    ]
+                    array_conditions.append(and_(*item_conditions))
             if array_conditions:
-                files = files.filter(func.or_(*array_conditions))
+                files = files.filter(or_(*array_conditions))
         elif isinstance(query[k], int):
             files = files.filter(file_meta[k].cast(Integer) == query[k])
         elif isinstance(query[k], float):
