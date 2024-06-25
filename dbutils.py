@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import joinedload
 from sqlalchemy.types import Integer, Float
 from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import JSONB
 import time
 from sqlalchemy import or_, update
 import time
@@ -566,7 +567,6 @@ def search_files(query_data, user_id, collection_id, file_name, owner_id, offset
         files = filterjson(files, File.meta, query_data)
 
     file_total = files.count()
-
     files = files.offset(offset).limit(limit)
 
     res_files = []
@@ -1158,57 +1158,64 @@ def validate_json(json_data, schema_data):
         return False
     return True
 
-def filterjson_old(filter, file, j):
-    jkeys = j.keys()
-    for k in jkeys:
-        if type(j[k]) == int:
-            filter = filter.filter(file[k].cast(Integer) == j[k])
-        elif type(j[k]) == float:
-            filter = filter.filter(file[k].cast(Float) == j[k])
-        elif j[k] == None:
-            filter = filter.filter(file.has_key(k))
-        elif "%" in j[k]:
-            filter = filter.filter(file[k].astext.ilike(j[k]))
-        elif type(j[k]) == str:
-            filter = filter.filter(file[k].astext == j[k])
-        elif "between" in j[k].keys():
-            filter = filter.filter(file[k].cast(Float) >= j[k]["between"][0]).filter(file[k].cast(Float) <= j[k]["between"][1])
+def filterjson_old(files, file_meta, query):
+    query_keys = query.keys()
+    for k in query_keys:
+        if type(query[k]) == int:
+            files = files.filter(file_meta[k].cast(Integer) == query[k])
+        elif type(query[k]) == float:
+            files = files.filter(file_meta[k].cast(Float) == query[k])
+        elif query[k] == None:
+            files = files.filter(file_meta.has_key(k))
+        elif "%" in query[k]:
+            files = files.filter(file_meta[k].astext.ilike(query[k]))
+        elif type(query[k]) == str:
+            files = files.filter(file_meta[k].astext == query[k])
+        elif "between" in query[k].keys():
+            files = files.filter(file_meta[k].cast(Float) >= query[k]["between"][0]).filter(file_meta[k].cast(Float) <= query[k]["between"][1])
         else:
             try:
-                filter = filterjson(filter, file[k], j[k])
+                files = filterjson(files, file_meta[k], query[k])
             except Exception:
                 traceback.print_exc()
-    return filter
+    return files
 
-def filterjson(filter, file, j):
-    jkeys = j.keys()
-    for k in jkeys:
-        if isinstance(j[k], int):
-            filter = filter.filter(file[k].cast(Integer) == j[k])
-        elif isinstance(j[k], float):
-            filter = filter.filter(file[k].cast(Float) == j[k])
-        elif j[k] is None:
-            filter = filter.filter(file.has_key(k))
-        elif "%" in j[k]:
-            filter = filter.filter(file[k].astext.ilike(j[k]))
-        elif isinstance(j[k], str):
-            filter = filter.filter(file[k].astext == j[k])
-        elif "between" in j[k]:
-            filter = filter.filter(file[k].cast(Float) >= j[k]["between"][0]).filter(file[k].cast(Float) <= j[k]["between"][1])
-        elif isinstance(j[k], list) and all(isinstance(i, dict) for i in j[k]):
-            # Handle lists of dictionaries
-            subfilters = []
-            for item in j[k]:
-                subfilter = filter
-                subfilter = filterjson(subfilter, file[k], item)
-                subfilters.append(subfilter)
-            filter = filter.filter(or_(*subfilters))
+def filterjson(files, file_meta, query):
+    query_keys = query.keys()
+    for k in query_keys:
+        if isinstance(query[k], dict):
+            if "between" in query[k]:
+                files = files.filter(file_meta[k].cast(Float) >= query[k]["between"][0])\
+                             .filter(file_meta[k].cast(Float) <= query[k]["between"][1])
+            else:
+                files = filterjson(files, file_meta[k], query[k])
+        elif isinstance(query[k], list):
+            # Handle array search
+            array_conditions = []
+            for item in query[k]:
+                if isinstance(item, dict):
+                    # Create a condition for each item in the array
+                    item_condition = func.jsonb_path_exists(
+                        file_meta[k],
+                        f'$[*] ? (' + ' && '.join([f'@.{sub_k} == {repr(sub_v)}' for sub_k, sub_v in item.items()]) + ')'
+                    )
+                    array_conditions.append(item_condition)
+            if array_conditions:
+                files = files.filter(func.or_(*array_conditions))
+        elif isinstance(query[k], int):
+            files = files.filter(file_meta[k].cast(Integer) == query[k])
+        elif isinstance(query[k], float):
+            files = files.filter(file_meta[k].cast(Float) == query[k])
+        elif query[k] is None:
+            files = files.filter(file_meta.has_key(k))
+        elif isinstance(query[k], str):
+            if "%" in query[k]:
+                files = files.filter(file_meta[k].astext.ilike(query[k]))
+            else:
+                files = files.filter(file_meta[k].astext == query[k])
         else:
-            try:
-                filter = filterjson(filter, file[k], j[k])
-            except Exception:
-                traceback.print_exc()
-    return filter
+            raise ValueError(f"Unsupported query type for key {k}: {type(query[k])}")
+    return files
 
 def annotate_file(file_id, metadata):
     file = File.query.filter(File.id == file_id).first()
