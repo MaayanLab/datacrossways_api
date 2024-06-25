@@ -486,8 +486,8 @@ def startmultipart():
         data = request.get_json()
         db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
         response = s3utils.start_multipart(db_file["uuid"]+"/"+data["filename"], conf["aws"])
-        res = {'status': 'ok', 'upload_id': response, 'uuid': db_file["uuid"]}
-        return jsonify({"message": "multipart upload started", 'upload_id': response, 'uuid': db_file["uuid"]}), 200
+        res = {'status': 'ok', 'upload_id': response, 'uuid': db_file["uuid"], 'id': db_file["id"]}
+        return jsonify({"message": "multipart upload started", 'upload_id': response, 'uuid': db_file["uuid"], 'id': db_file["id"]}), 200
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to start multipart upload"), 500

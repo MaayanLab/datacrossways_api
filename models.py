@@ -42,7 +42,7 @@ class User(db.Model):
     roles = db.relationship('Role', secondary='user_roles', cascade='all, delete')
     keys = db.relationship('Accesskey', cascade='all, delete', backref='user', lazy=True)
 
-    def __init__(self, name, first_name, last_name, email, affiliation="", orcid_id=None, storage_quota=10000):
+    def __init__(self, name, first_name, last_name, email, affiliation="", orcid_id=None, storage_quota=5000):
         self.name = name
         self.first_name = first_name
         self.last_name = last_name

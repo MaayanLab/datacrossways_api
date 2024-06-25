@@ -418,11 +418,17 @@ def print_policy(policy):
 
 def create_file(db, file_name, file_size, user_id):
     user = db.session.query(User).filter(User.id == user_id).first()
-    file = File(name=file_name, user=user, size=file_size, collection_id=1, status="uploading")
-    db.session.add_all([file])
-    db.session.commit()
-    db.session.refresh(file)
-    return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "owner_name": user.name, "size": file.size, "accessibility": file.accessibility, "visibility": file.visibility, "collection_id": file.collection_id}
+    total_file_size = db.session.query(func.sum(File.size)).filter(File.owner_id == user.id).scalar() or 0
+    total_file_size += file_size
+    total_file_size = total_file_size/(1024*1024)
+    if total_file_size <= user.storage_quota:
+        file = File(name=file_name, user=user, size=file_size, collection_id=1, status="uploading")
+        db.session.add_all([file])
+        db.session.commit()
+        db.session.refresh(file)
+        return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "owner_name": user.name, "size": file.size, "accessibility": file.accessibility, "visibility": file.visibility, "collection_id": file.collection_id}
+    else:
+        raise Exception("Storage quota exceeded.")
 
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
@@ -532,7 +538,7 @@ def list_collection_files(user_id):
     return []
 
 @TimedCache(timeout=2)
-def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
+def search_files(query_data, user_id, collection_id, file_name, owner_id, offset=0, limit=20):
     
     tt = time.time()
 
@@ -558,8 +564,8 @@ def search_files(data, user_id, collection_id, file_name, owner_id, offset=0, li
             )
         )
 
-    if data != "":
-        files = filterjson(files, File.meta, data)
+    if query_data != "":
+        files = filterjson(files, File.meta, query_data)
 
     file_total = files.count()
 
