@@ -1189,11 +1189,6 @@ def filterjson(files, file_meta, query):
                              .filter(file_meta[k].cast(Float) <= query[k]["between"][1])
             else:
                 files = filterjson(files, file_meta[k], query[k])
-        elif isinstance(query[k], list):
-            file_list = []
-            for item in file_meta[k]:
-                file_list.append(filterjson(files, item, query[k][0]))
-            files = files.union(*file_list)
         elif isinstance(query[k], int):
             files = files.filter(file_meta[k].cast(Integer) == query[k])
         elif isinstance(query[k], float):
