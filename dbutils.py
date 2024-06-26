@@ -1190,16 +1190,10 @@ def filterjson(files, file_meta, query):
             else:
                 files = filterjson(files, file_meta[k], query[k])
         elif isinstance(query[k], list):
-            # Handle array search
-            for item in query[k]:
-                if isinstance(item, dict):
-                    subquery = files.session.query(files.c.id).filter(
-                        and_(*[
-                            func.jsonb_array_elements(file_meta[k]).op('->>')(sub_k) == str(sub_v)
-                            for sub_k, sub_v in item.items()
-                        ])
-                    ).exists()
-                    files = files.filter(subquery)
+            file_list = []
+            for item in file_meta[k]:
+                file_list.append(filterjson(files, item, query[k][0]))
+            files = files.union(*file_list)
         elif isinstance(query[k], int):
             files = files.filter(file_meta[k].cast(Integer) == query[k])
         elif isinstance(query[k], float):
