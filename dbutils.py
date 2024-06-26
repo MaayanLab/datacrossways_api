@@ -10,7 +10,7 @@ from sqlalchemy.types import Integer, Float
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import JSONB
 import time
-from sqlalchemy import or_, update, any_
+from sqlalchemy import or_, update, any_, and_
 import time
 from itertools import chain
 from functools import lru_cache
@@ -1193,14 +1193,13 @@ def filterjson(files, file_meta, query):
             # Handle array search
             for item in query[k]:
                 if isinstance(item, dict):
-                    # Create a condition for each key-value pair in the item
-                    for sub_k, sub_v in item.items():
-                        files = files.filter(
-                            func.jsonb_path_exists(
-                                file_meta[k],
-                                f'$[*] ? (@.{sub_k} == {repr(sub_v)})'
-                            )
-                        )
+                    subquery = files.session.query(files.c.id).filter(
+                        and_(*[
+                            func.jsonb_array_elements(file_meta[k]).op('->>')(sub_k) == str(sub_v)
+                            for sub_k, sub_v in item.items()
+                        ])
+                    ).exists()
+                    files = files.filter(subquery)
         elif isinstance(query[k], int):
             files = files.filter(file_meta[k].cast(Integer) == query[k])
         elif isinstance(query[k], float):
