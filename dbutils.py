@@ -1196,10 +1196,9 @@ def filterjson(files, file_meta, query):
                     # Create a condition for each key-value pair in the item
                     for sub_k, sub_v in item.items():
                         files = files.filter(
-                            any_(
-                                file_meta[k].cast(JSONB).contains(
-                                    {sub_k: sub_v}
-                                )
+                            func.jsonb_path_exists(
+                                file_meta[k],
+                                f'$[*] ? (@.{sub_k} == {repr(sub_v)})'
                             )
                         )
         elif isinstance(query[k], int):
