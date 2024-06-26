@@ -45,6 +45,8 @@ yarn.lock
 test/*
 requirements_old.txt
 
+datacrosswayspy/*
+test_database.*
 db/examples.py
 
 addtestdata.py

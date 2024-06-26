@@ -353,6 +353,7 @@ def patch_file():
         dbutils.update_file(db, file)
         return jsonify(message="file updated"), 200
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when updating file"), 500
 
 @app.route('/api/file/metadata/<int:file_id>', methods = ["GET"])
