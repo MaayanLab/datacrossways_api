@@ -1158,7 +1158,7 @@ def validate_json(json_data, schema_data):
         return False
     return True
 
-def filterjson_old(files, file_meta, query):
+def filterjson(files, file_meta, query):
     query_keys = query.keys()
     for k in query_keys:
         if type(query[k]) == int:
@@ -1180,7 +1180,7 @@ def filterjson_old(files, file_meta, query):
                 traceback.print_exc()
     return files
 
-def filterjson(files, file_meta, query):
+def filterjson_testing(files, file_meta, query):
     query_keys = query.keys()
     for k in query_keys:
         if isinstance(query[k], dict):
