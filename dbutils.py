@@ -622,7 +622,7 @@ def list_users():
     db_users = User.query.order_by(User.id).all()
     users = []
     for user in db_users:
-        users.append(print_user(user))
+        users.append(print_user_for_list(user))
     return users
 
 def get_user_roles(userid):
@@ -647,6 +647,15 @@ def print_user(user):
     user["files"] = files
     user["roles"] = roles
     user["collections"] = collections
+    return(user)
+
+def print_user_for_list(user):
+    roles = []
+    for r in user.roles:
+        roles.append({"id": r.id, "name": r.name, "description": r.description})
+    user = dict(user.__dict__)
+    user.pop('_sa_instance_state', None)
+    user["roles"] = roles
     return(user)
 
 def print_user_short(user):
