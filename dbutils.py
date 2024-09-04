@@ -1341,3 +1341,54 @@ def get_file_by_id(file_id, user_id):
     collection_result = {"id": collection.id, "name": collection.name, "uuid": collection.uuid}
     file_result = {"id": file[0].id, "name": file[0].name, "display_name": file[0].display_name, "uuid": file[0].uuid, "status": file[0].status, "date": file[0].creation_date, "owner": owner_result, "visibility": file[0].visibility, "accessibility": file[0].accessibility, 'collection': collection_result, 'size': file[0].size, 'meta': file[0].meta, 'checksum': file[0].checksum}
     return file_result
+
+
+def list_file_logs(offset, limit, file_id):
+    """
+    List logs for a specific file.
+
+    :param offset: The starting point for the query.
+    :param limit: The maximum number of logs to return.
+    :param file_id: The ID of the file to retrieve logs for.
+    :return: A tuple containing the list of logs and the total count of logs for the file.
+    """
+    query = db.session.query(DownloadLog).filter(DownloadLog.file_id == file_id)
+    total_logs = query.count()
+    
+    logs = query.order_by(DownloadLog.download_timestamp.desc()).offset(offset).limit(limit).all()
+    log_entries = []
+    
+    for log in logs:
+        log_entries.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "file_id": log.file_id,
+            "download_timestamp": log.download_timestamp
+        })
+    
+    return log_entries, total_logs
+
+def list_user_logs(offset, limit, user_id):
+    """
+    List logs for a specific user.
+
+    :param offset: The starting point for the query.
+    :param limit: The maximum number of logs to return.
+    :param user_id: The ID of the user to retrieve logs for.
+    :return: A tuple containing the list of logs and the total count of logs for the user.
+    """
+    query = db.session.query(DownloadLog).filter(DownloadLog.user_id == user_id)
+    total_logs = query.count()
+    
+    logs = query.order_by(DownloadLog.download_timestamp.desc()).offset(offset).limit(limit).all()
+    log_entries = []
+    
+    for log in logs:
+        log_entries.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "file_id": log.file_id,
+            "download_timestamp": log.download_timestamp
+        })
+    
+    return log_entries, total_logs

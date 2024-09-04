@@ -356,6 +356,38 @@ def patch_file():
         traceback.print_exc()
         return jsonify(message="An error occurred when updating file"), 500
 
+@app.route('/api/file/log/<int:file_id>', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_file_log(file_id):
+    try:
+        offset = int(request.args.get("offset", default=0))
+        limit = int(request.args.get("limit", default=20))
+        user = dict(session).get('user', None)
+        files, file_count = dbutils.list_file_logs(offset, limit, file_id)
+        return jsonify({"message": "file log listed successfully", "files": files, "total_logs": file_count})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing file log"), 500
+
+@app.route('/api/user/log', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+@admin_required
+def get_user_log(file_id):
+    try:
+        offset = int(request.args.get("offset", default=0))
+        limit = int(request.args.get("limit", default=20))
+        user = dict(session).get('user', None)
+        files, file_count = dbutils.list_user_logs(offset, limit, user_id=user["id"])
+        return jsonify({"message": "logs listed successfully", "logs": files, "total_logs": file_count})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when listing user log"), 500
+
 @app.route('/api/file/metadata/<int:file_id>', methods = ["GET"])
 @accesskey_login
 @dev_login
