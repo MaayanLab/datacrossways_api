@@ -1,5 +1,5 @@
 import traceback
-from app import db, session, User, File, Collection, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
+from app import db, session, User, File, Collection, DownloadLog, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import json
 import jsonschema
 from jsonschema import validate
@@ -434,6 +434,11 @@ def create_file(db, file_name, file_size, user_id):
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
 
+def log_file_download(user_id, file_id):
+    new_log = DownloadLog(user_id=user_id, file_id=file_id)
+    db.session.add(new_log)
+    db.session.commit()
+
 def download_file(file_id, user_id):
     (list_creds, read_creds, write_creds) = get_scope(user_id)
     files = db.session.query(File).filter(File.id == file_id)
@@ -446,7 +451,12 @@ def download_file(file_id, user_id):
                 Collection.accessibility == "open"
             )
     )
-    return files.first()
+    down_file = files.first()
+
+    if down_file:
+        log_file_download(user_id, file_id)
+
+    return down_file
 
 def delete_file(file_id, user):
     if is_admin(user["id"]) or is_owner_file(user["id"], file_id):

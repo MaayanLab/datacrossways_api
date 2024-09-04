@@ -89,6 +89,24 @@ class File(db.Model):
             if hasattr(self, key):
                 setattr(self, key, value)
 
+class DownloadLog(db.Model):
+    __tablename__ = 'download_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', onupdate='CASCADE', ondelete='SET NULL'), index=True, nullable=False)
+    file_id = db.Column(db.Integer, db.ForeignKey('files.id', onupdate='CASCADE', ondelete='SET NULL'), index=True, nullable=False)
+    download_timestamp = db.Column(db.DateTime, default=datetime.now, nullable=False)
+
+    user = db.relationship('User', backref='download_logs')
+    file = db.relationship('File', backref='download_logs')
+    
+    def __init__(self, user_id, file_id):
+        self.user_id = user_id
+        self.file_id = file_id
+
+    def __repr__(self):
+        return f"<DownloadLog user_id={self.user_id} file_id={self.file_id} download_timestamp={self.download_timestamp}>"
+
 class Collection(db.Model):
     __tablename__ = 'collections'
     
