@@ -1065,9 +1065,13 @@ def update_file(db, file):
 def file_checksum_status():
     db_files = db.session.query(File).filter(File.checksum == "").all()
     for db_file in db_files:
-        checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
-        db_file.status = "ready"
-        db_file.checksum = checksum
+        try:
+            checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
+            db_file.status = "ready"
+            db_file.checksum = checksum
+        except Exception:
+            print("checksum missing for", db_file.name)
+    
     db.session.commit()
 
 def list_policies():
