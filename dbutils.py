@@ -799,7 +799,7 @@ def create_collection(collection, user_id):
 
 def update_collection(collection, user_id):
     dbcollection = db.session.query(Collection).filter(Collection.id == collection["id"]).first()
-    if dbcollection.owner_id == user_id or is_admin():
+    if dbcollection.owner_id == user_id or is_admin(user_id):
         #dbroot = db.session.query(Collection).filter(Collection.id == 1).first()
         collection.pop("creation_date", None)
         collection.pop("uuid", None)
@@ -856,7 +856,7 @@ def update_collection(collection, user_id):
 def delete_collection(collection_id, user_id):
     if collection_id != 1:
         db_collection = db.session.query(Collection).filter(Collection.id == collection_id).first()
-        if db_collection.owner_id == user_id or is_admin():
+        if db_collection.owner_id == user_id or is_admin(user_id):
             query = update(File).where(File.collection_id == collection_id).values(collection_id=1)
             db.session.execute(query)
             db.session.commit()
