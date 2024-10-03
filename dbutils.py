@@ -440,23 +440,27 @@ def log_file_download(user_id, file_id):
     db.session.commit()
 
 def download_file(file_id, user_id):
-    (list_creds, read_creds, write_creds) = get_scope(user_id)
-    files = db.session.query(File).filter(File.id == file_id)
-    files = files.join(Collection, File.collection_id == Collection.id).filter(
-            or_(
-                File.collection_id.in_(read_creds),
-                File.id.in_(read_creds),
-                File.accessibility != "locked",
-                File.owner_id == user_id,
-                Collection.accessibility == "open"
-            )
-    )
-    down_file = files.first()
-
-    if down_file:
+    if is_admin(user_id):
         log_file_download(user_id, file_id)
+        return db.session.query(File).filter(File.id == file_id).first()
+    else:
+        (list_creds, read_creds, write_creds) = get_scope(user_id)
+        files = db.session.query(File).filter(File.id == file_id)
+        files = files.join(Collection, File.collection_id == Collection.id).filter(
+                or_(
+                    File.collection_id.in_(read_creds),
+                    File.id.in_(read_creds),
+                    File.accessibility != "locked",
+                    File.owner_id == user_id,
+                    Collection.accessibility == "open"
+                )
+        )
+        down_file = files.first()
 
-    return down_file
+        if down_file:
+            log_file_download(user_id, file_id)
+
+        return down_file
 
 def delete_file(file_id, user):
     if is_admin(user["id"]) or is_owner_file(user["id"], file_id):
