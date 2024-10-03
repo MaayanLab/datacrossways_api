@@ -34,7 +34,7 @@ class User(db.Model):
     creation_date = db.Column(db.DateTime, default=datetime.now)
     uuid = db.Column(db.String(), default=generate_uuid, index=True)
     orcid_id = db.Column(db.String(), unique=True)
-    storage_quota = db.Column(db.Integer(), default=100000)
+    storage_quota = db.Column(db.BigInteger(), default=100000)
 
     # relationships
     files = db.relationship('File', cascade='all, delete', backref='user', lazy=True)
@@ -75,7 +75,7 @@ class File(db.Model):
     description = db.Column(db.String())
     checksum = db.Column(db.String(), default="")
     creation_date = db.Column(db.DateTime, default=datetime.now)
-    size = db.Column(db.Integer(), default=0)
+    size = db.Column(db.BigInteger(), default=0)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id', onupdate='CASCADE'), index=True)
     collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', onupdate='CASCADE'), index=True, default=1)
 

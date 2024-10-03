@@ -422,6 +422,7 @@ def create_file(db, file_name, file_size, user_id):
     total_file_size = db.session.query(func.sum(File.size)).filter(File.owner_id == user.id).scalar() or 0
     total_file_size += file_size
     total_file_size = total_file_size/(1024*1024)
+    print(file_name, file_size)
     if total_file_size <= user.storage_quota:
         file = File(name=file_name, user=user, size=file_size, collection_id=1, status="uploading")
         db.session.add_all([file])
