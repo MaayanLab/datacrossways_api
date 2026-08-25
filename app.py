@@ -14,6 +14,7 @@ from flask_migrate import Migrate
 from models import db, User, File, Collection, DownloadLog, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import dbutils
 import s3utils
+import projects_data
 
 from middleware import login_required, upload_credentials, admin_required, accesskey_login, dev_login
 
@@ -1004,6 +1005,22 @@ def user_by_id(user_id):
 def list_policies():
     policies = dbutils.list_policies()
     return jsonify(policies)
+
+# ============== projects ============
+@app.route('/api/projects', methods = ['GET'])
+@accesskey_login
+@dev_login
+def list_projects():
+    # Public endpoint - no @login_required. `has_collection` (used for the
+    # data-uploaded/pending filter) reflects whether a collection exists at
+    # all, so it reads the same for every visitor; the actual clickable
+    # collection link is only populated from the current user's own
+    # permission-scoped collection list, so an anonymous or unauthorized
+    # visitor never gets a working link.
+    user = dict(session).get('user', None)
+    collections = dbutils.list_collections(user["id"]) if user else []
+    all_collections = [{"id": c.id, "name": c.name, "project_id": c.project_id} for c in Collection.query.all()]
+    return jsonify(projects=projects_data.get_projects(collections=collections, all_collections=all_collections))
 
 # ----------- Proxy to next.js frontend -----------
 
