@@ -798,6 +798,7 @@ def create_collection(collection, user_id):
             raise Exception("Invalid parent, collection does not exist")
     else:
         collection["parent_collection_id"] = 1
+    collection["project_id"] = collection.get("project_id") or None
     dbcollection = Collection(**collection)
     db.session.add_all([dbcollection])
     db.session.commit()
@@ -840,6 +841,8 @@ def update_collection(collection, user_id):
             dbcollection.description = collection["description"]
         if "image_url" in collection:
             dbcollection.image_url = collection["image_url"]
+        if "project_id" in collection:
+            dbcollection.project_id = collection["project_id"] or None
         if "visibility" in collection:
             dbcollection.visibility = collection["visibility"]
         if "affiliation" in collection:
@@ -931,6 +934,7 @@ def get_collection(collection_id, user_id):
         "files": sub_files.count(),
         "accessibility": collection.accessibility,
         "visibility": collection.visibility,
+        "project_id": collection.project_id,
         "path": get_parent_collection_path(collection_id),
     }
 

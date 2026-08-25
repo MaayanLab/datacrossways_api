@@ -117,6 +117,11 @@ class Collection(db.Model):
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
     visibility = db.Column(db.String(), default="hidden")
     accessibility = db.Column(db.String(), default="open")
+    # Links this collection to a project on the Projects page (its stable
+    # funding code, e.g. "Lyme 06b"). Set by the collection's owner; kept
+    # separate from `name` so linking never constrains how they organize
+    # or name their own collections.
+    project_id = db.Column(db.String(), index=True)
 
     # relationships
     collections = db.relationship('Collection', cascade='all, delete', backref=db.backref('parent', remote_side=[id]), lazy=True)
