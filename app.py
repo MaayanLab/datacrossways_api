@@ -693,6 +693,18 @@ def get_collections():
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to list collections"), 500
 
+@app.route('/api/collection/visible', methods = ["GET"])
+@accesskey_login
+@dev_login
+@login_required
+def list_visible_collections():
+    try:
+        collections = dbutils.list_visible_collections()
+        return jsonify({"message": "visible collections listed successfully", "collections": collections})
+    except Exception:
+        traceback.print_exc()
+        return jsonify(message="An error occurred when attempting to list visible collections"), 500
+
 @app.route('/api/collection/<int:collection_id>', methods = ["GET"])
 @accesskey_login
 @dev_login
@@ -1034,7 +1046,13 @@ def proxy(*args, **kwargs):
     resp = requests.request(
         method=request.method,
         url=request.url.replace(request.host_url, conf["frontend"]["url"]),
-        headers={key: value for (key, value) in request.headers if key != 'Host'},
+        # Drop the browser's Accept-Encoding (which may request Brotli) so
+        # the frontend dev server responds with gzip/deflate instead -
+        # formats `requests` can always decode without extra dependencies.
+        # Forwarding Brotli through unmodified left `resp.content` as
+        # still-compressed bytes served with no Content-Encoding header,
+        # i.e. raw binary in the browser.
+        headers={key: value for (key, value) in request.headers if key.lower() not in ('host', 'accept-encoding')},
         data=request.get_data(),
         cookies=request.cookies,
         allow_redirects=False)

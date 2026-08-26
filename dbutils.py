@@ -75,6 +75,26 @@ def get_stats():
         file_size_sum = file_size_sum+file_size[0]
     return {"files": file_count, "datasets": collection_count, "size": file_size_sum}
 
+def list_visible_collections(limit=None):
+    # Collections auto-populate here the moment their visibility is turned
+    # on - no manual curation. Newest first, since this powers a "what's
+    # been uploaded" showcase, not a fixed editorial list.
+    query = db.session.query(Collection).filter(
+        Collection.visibility == "visible"
+    ).order_by(Collection.creation_date.desc())
+    if limit:
+        query = query.limit(limit)
+    return [
+        {
+            "id": c.id,
+            "uuid": c.uuid,
+            "name": c.name,
+            "description": c.description,
+            "image_url": c.image_url,
+        }
+        for c in query.all()
+    ]
+
 def get_user_by_id_json(id):
     db_user = db.session.query(User).filter(User.id == id).first()
     user = ""
