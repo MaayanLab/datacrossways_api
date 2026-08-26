@@ -69,11 +69,17 @@ def is_owner_key(user_id, key_id):
 def get_stats():
     file_count = db.session.query(File.id).count()
     collection_count = db.session.query(Collection.id).filter(Collection.visibility == "visible").count()
-    file_sizes = db.session.query(File.size).all()
+    # file_sizes = db.session.query(File.size).all()
+    # file_size_sum = 0
+    # for file_size in file_sizes:
+    #     file_size_sum = file_size_sum+file_size[0]
+    files = db.session.query(File).all()
     file_size_sum = 0
-    for file_size in file_sizes:
-        file_size_sum = file_size_sum+file_size[0]
-    return {"files": file_count, "datasets": collection_count, "size": file_size_sum}
+    ext = set()
+    for file in files:
+        file_size_sum += file.size
+        ext.add(file.name.split(".")[-1])
+    return {"files": file_count, "datasets": collection_count, "size": file_size_sum, "file_types": len(ext)}
 
 def list_visible_collections(limit=None):
     # Collections auto-populate here the moment their visibility is turned

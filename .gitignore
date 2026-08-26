@@ -50,5 +50,5 @@ test_database.*
 db/examples.py
 
 addtestdata.py
-
-venv/
+venv
+data/
