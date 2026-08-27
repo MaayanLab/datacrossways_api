@@ -81,6 +81,26 @@ def get_stats():
         ext.add(file.name.split(".")[-1])
     return {"files": file_count, "datasets": collection_count, "size": file_size_sum, "file_types": len(ext)}
 
+def list_visible_collections(limit=None):
+    # Collections auto-populate here the moment their visibility is turned
+    # on - no manual curation. Newest first, since this powers a "what's
+    # been uploaded" showcase, not a fixed editorial list.
+    query = db.session.query(Collection).filter(
+        Collection.visibility == "visible"
+    ).order_by(Collection.creation_date.desc())
+    if limit:
+        query = query.limit(limit)
+    return [
+        {
+            "id": c.id,
+            "uuid": c.uuid,
+            "name": c.name,
+            "description": c.description,
+            "image_url": c.image_url,
+        }
+        for c in query.all()
+    ]
+
 def get_user_by_id_json(id):
     db_user = db.session.query(User).filter(User.id == id).first()
     user = ""
@@ -97,6 +117,20 @@ def get_user_by_id(id):
     if db_user:
         user = db_user
     return user
+
+def get_dev_login_user():
+    # Used only by the dev_login bypass (secrets/config.json "development":
+    # true). Looks up the first admin by role rather than a hardcoded id,
+    # since which numeric id is an admin varies by environment/database -
+    # returns None (not a crash) if no admin exists yet.
+    return (
+        db.session.query(User)
+        .join(UserRole, User.id == UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(Role.name == "admin")
+        .order_by(User.id)
+        .first()
+    )
 
 def get_user(db, user_info):
     user = ""
@@ -804,6 +838,7 @@ def create_collection(collection, user_id):
             raise Exception("Invalid parent, collection does not exist")
     else:
         collection["parent_collection_id"] = 1
+    collection["project_id"] = collection.get("project_id") or None
     dbcollection = Collection(**collection)
     db.session.add_all([dbcollection])
     db.session.commit()
@@ -846,6 +881,8 @@ def update_collection(collection, user_id):
             dbcollection.description = collection["description"]
         if "image_url" in collection:
             dbcollection.image_url = collection["image_url"]
+        if "project_id" in collection:
+            dbcollection.project_id = collection["project_id"] or None
         if "visibility" in collection:
             dbcollection.visibility = collection["visibility"]
         if "affiliation" in collection:
@@ -937,6 +974,7 @@ def get_collection(collection_id, user_id):
         "files": sub_files.count(),
         "accessibility": collection.accessibility,
         "visibility": collection.visibility,
+        "project_id": collection.project_id,
         "path": get_parent_collection_path(collection_id),
     }
 
