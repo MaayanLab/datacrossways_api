@@ -14,9 +14,10 @@ def dev_login(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if conf.get("development", False) == True:
-            user = dbutils.get_user_by_id(4)
-            session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-            session.permanent = True
+            user = dbutils.get_dev_login_user()
+            if user:
+                session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+                session.permanent = True
         return f(*args, **kwargs)
     return decorated_function
 
