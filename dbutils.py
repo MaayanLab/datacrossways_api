@@ -118,6 +118,20 @@ def get_user_by_id(id):
         user = db_user
     return user
 
+def get_dev_login_user():
+    # Used only by the dev_login bypass (secrets/config.json "development":
+    # true). Looks up the first admin by role rather than a hardcoded id,
+    # since which numeric id is an admin varies by environment/database -
+    # returns None (not a crash) if no admin exists yet.
+    return (
+        db.session.query(User)
+        .join(UserRole, User.id == UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(Role.name == "admin")
+        .order_by(User.id)
+        .first()
+    )
+
 def get_user(db, user_info):
     user = ""
     if user_info.get("orcid_id") != None:
