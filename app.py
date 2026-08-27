@@ -71,6 +71,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 app.app_context().push()
 
+migrate = Migrate(app, db)
+
 pool_size = db.engine.pool.size()
 print(f"Current pool size: {pool_size}")
 
