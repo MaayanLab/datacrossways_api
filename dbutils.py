@@ -460,6 +460,10 @@ def print_policy(policy):
 # ===== files ========
 
 def create_file(db, file_name, file_size, user_id):
+    if not isinstance(file_name, str) or not file_name.strip() or len(file_name) > 512 or any(ord(c) < 32 for c in file_name):
+        raise ValueError("Invalid filename")
+    if not isinstance(file_size, int) or file_size <= 0:
+        raise ValueError("Invalid file size")
     user = db.session.query(User).filter(User.id == user_id).first()
     total_file_size = db.session.query(func.sum(File.size)).filter(File.owner_id == user.id).scalar() or 0
     total_file_size += file_size
@@ -473,6 +477,29 @@ def create_file(db, file_name, file_size, user_id):
         return {"id": file.id, "name": file.name, "display_name": file.name, "uuid": file.uuid, "status": file.status, "date": file.creation_date, "owner_id": file.owner_id, "owner_name": user.name, "size": file.size, "accessibility": file.accessibility, "visibility": file.visibility, "collection_id": file.collection_id}
     else:
         raise Exception("Storage quota exceeded.")
+
+def authorize_upload_key(user_id, object_key):
+    if not isinstance(object_key, str) or "/" not in object_key:
+        raise PermissionError("Invalid upload key")
+    file_uuid, file_name = object_key.split("/", 1)
+    db_file = db.session.query(File).filter(File.uuid == file_uuid, File.name == file_name).first()
+    if not db_file or db_file.owner_id != user_id or db_file.status != "uploading":
+        raise PermissionError("Upload does not belong to requester")
+    return db_file
+
+def finalize_upload(file_id, user_id, actual_size):
+    db_file = db.session.query(File).filter(File.id == file_id, File.owner_id == user_id).first()
+    if not db_file:
+        raise PermissionError("Upload does not belong to requester")
+    other_size = db.session.query(func.sum(File.size)).filter(File.owner_id == user_id, File.id != file_id).scalar() or 0
+    if (other_size + actual_size) / (1024 * 1024) > db_file.user.storage_quota:
+        s3utils.delete_file(db_file.uuid, db_file.name)
+        db.session.delete(db_file)
+        db.session.commit()
+        raise ValueError("Actual upload size exceeds storage quota")
+    db_file.size = actual_size
+    db_file.status = "ready"
+    db.session.commit()
 
 def get_file(file_id):
     return File.query.filter_by(id=file_id).first()
@@ -834,8 +861,12 @@ def create_collection(collection, user_id):
     collection.pop("uuid", None)
     collection["owner_id"] = user_id
     if "parent_collection_id" in collection:
-        if not db.session.query(Collection).filter(Collection.id == collection["parent_collection_id"]).first():
+        parent = db.session.query(Collection).filter(Collection.id == collection["parent_collection_id"]).first()
+        if not parent:
             raise Exception("Invalid parent, collection does not exist")
+        _, _, write_creds = get_scope(user_id)
+        if parent.owner_id != user_id and parent.id not in write_creds and not is_admin(user_id):
+            raise PermissionError("No write permission for parent collection")
     else:
         collection["parent_collection_id"] = 1
     collection["project_id"] = collection.get("project_id") or None
@@ -860,6 +891,14 @@ def update_collection(collection, user_id):
         files = collection.pop("files", [])
         overwrite = collection.pop("overwrite", False)
 
+        _, _, write_creds = get_scope(user_id)
+        requested_collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
+        requested_files = db.session.query(File).filter(File.id.in_(files)).all()
+        if any(c.owner_id != user_id and c.id not in write_creds for c in requested_collections) and not is_admin(user_id):
+            raise PermissionError("No write permission for a child collection")
+        if any(f.owner_id != user_id and f.collection_id not in write_creds and f.id not in write_creds for f in requested_files) and not is_admin(user_id):
+            raise PermissionError("No write permission for a file")
+
         if overwrite:
             for c in dbcollection.collections:
                 if c.id not in collections:
@@ -869,11 +908,11 @@ def update_collection(collection, user_id):
                     f.collection_id = 1
             db.session.commit()
             db.session.refresh(dbcollection)
-            dbcollection.collections = db.session.query(Collection).filter(Collection.id.in_(collections)).all()
-            dbcollection.files = db.session.query(File).filter(File.id.in_(files)).all()
+            dbcollection.collections = requested_collections
+            dbcollection.files = requested_files
         else:
-            dbcollection.collections = list(set(dbcollection.collections + db.session.query(Collection).filter(Collection.id.in_(collections)).all()))
-            dbcollection.files  = list(set(dbcollection.files + db.session.query(File).filter(File.id.in_(files)).all()))
+            dbcollection.collections = list(set(dbcollection.collections + requested_collections))
+            dbcollection.files  = list(set(dbcollection.files + requested_files))
 
         if "name" in collection:
             dbcollection.name = collection["name"]
@@ -887,11 +926,16 @@ def update_collection(collection, user_id):
             dbcollection.visibility = collection["visibility"]
         if "affiliation" in collection:
             dbcollection.affiliation = collection["affiliation"]
-        if "owner_id" in collection:
+        if "owner_id" in collection and is_admin(user_id):
             dbcollection.owner_id = collection["owner_id"]
         if "parent_collection_id" in collection:
             if collection["parent_collection_id"] != dbcollection.id:
-                dbcollection.parent_collection_id = collection["parent_collection_id"]
+                parent = db.session.query(Collection).filter(Collection.id == collection["parent_collection_id"]).first()
+                if not parent:
+                    raise ValueError("Parent collection does not exist")
+                if parent.owner_id != user_id and parent.id not in write_creds and not is_admin(user_id):
+                    raise PermissionError("No write permission for parent collection")
+                dbcollection.parent_collection_id = parent.id
         if "visibility" in collection:
             dbcollection.visibility = collection["visibility"]
         if "accessibility" in collection:
@@ -936,6 +980,9 @@ def get_collection(collection_id, user_id):
         return None
 
     collection, db_owner = query_result
+    allowed_ids = list_creds | read_creds | write_creds
+    if not (is_user_admin or collection.owner_id == user_id or collection.visibility != "hidden" or collection.id in allowed_ids):
+        raise PermissionError("No permission to view collection")
 
     owner = {
         "id": db_owner.id,
@@ -956,7 +1003,7 @@ def get_collection(collection_id, user_id):
     child_collections = [
         {"id": sc.id, "name": sc.name, "uuid": sc.uuid}
         for sc in sub_collections
-        if sc.uuid in list_creds or sc.visibility == "visible" or is_user_admin
+        if sc.id in allowed_ids or sc.owner_id == user_id or sc.visibility != "hidden" or is_user_admin
     ]
 
     return {
@@ -991,7 +1038,7 @@ def get_collection_old(collection_id, user_id):
     # collection_return = {"id": collection.id, "name": collection.name, "description": collection.description, "uuid": collection.uuid, "parent_collection_id": collection.parent_collection_id, "date": collection.creation_date, "owner_id": collection.owner_id, "child_collections": [], "child_files": []}
     
     for sc in sub_collections:
-        if sc.uuid in list_creds or sc.visibility == "visible" or is_admin(user_id):
+        if sc.id in (list_creds | read_creds | write_creds) or sc.owner_id == user_id or sc.visibility != "hidden" or is_admin(user_id):
             temp_collection = {"id": sc.id, "name": sc.name, "uuid": sc.uuid}
             collection_return["child_collections"].append(temp_collection)
     
@@ -1020,7 +1067,8 @@ def get_collection_files(collection_id, offset, limit, user_id):
     print("get collection", time.time()-st)
 
     is_user_admin = is_admin(user_id)
-    if collection is None or (collection.uuid not in list_creds and not is_user_admin):
+    allowed_ids = list_creds | read_creds | write_creds
+    if collection is None or (collection.id not in allowed_ids and collection.owner_id != user_id and collection.visibility == "hidden" and not is_user_admin):
         return []
 
     st = time.time()
@@ -1093,12 +1141,17 @@ def get_parent_collection_path(collection_id):
             break
     return collection_path
 
-def update_file(db, file):
+def update_file(db, file, user_id):
     db_file = db.session.query(File).filter(File.id == file["id"]).first()
+    if not db_file:
+        raise ValueError("File does not exist")
+    _, _, write_creds = get_scope(user_id)
+    if db_file.owner_id != user_id and db_file.id not in write_creds and db_file.collection_id not in write_creds and not is_admin(user_id):
+        raise PermissionError("No permission to update file")
     
     if "display_name" in file:
         db_file.display_name = file["display_name"]
-    if "owner_id" in file:
+    if "owner_id" in file and is_admin(user_id):
         db_file.owner_id = file["owner_id"]
     if "collection_id" in file:
         db_file.collection_id = file["collection_id"]
@@ -1164,18 +1217,20 @@ def list_user_access_keys(user_id):
     db_access_keys = db.session.query(Accesskey).filter(Accesskey.owner_id == user_id).order_by(Accesskey.id).all()
     access_keys = []
     for key in db_access_keys:
-        access_keys.append({"id": key.id, "expiration_time": key.expiration_time, "creation_date": key.creation_date, "uuid": key.uuid});
+        access_keys.append({"id": key.id, "expiration_time": key.expiration_time, "creation_date": key.creation_date});
 
     return access_keys
 
 def create_access_key(user_id, expiration_time):
+    import hashlib
+    import secrets
     user = db.session.query(User).filter(User.id == user_id).first()
-    akey = Accesskey(user=user, expiration_time=expiration_time)
+    raw_key = secrets.token_urlsafe(32)
+    akey = Accesskey(user=user, expiration_time=min(max(expiration_time, 1), 525600), uuid=hashlib.sha256(raw_key.encode()).hexdigest())
     db.session.add(akey)
     db.session.commit()
     db.session.refresh(akey)
-    k = dict(akey.__dict__)
-    k.pop('_sa_instance_state', None)
+    k = {"id": akey.id, "uuid": raw_key, "creation_date": akey.creation_date, "expiration_time": akey.expiration_time}
     return  k
 
 def delete_access_key(user_id, key_id):
@@ -1188,15 +1243,19 @@ def delete_access_key(user_id, key_id):
         return 0
 
 def get_key_user(user_key):
-    akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
+    import hashlib
+    akey = db.session.query(Accesskey).filter(Accesskey.uuid == hashlib.sha256(user_key.encode()).hexdigest()).first()
     user = db.session.query(User).filter(User.id == akey.owner_id).first()
     return user
 
 def key_valid(user_key):
     try:
-        akey = db.session.query(Accesskey).filter(Accesskey.uuid == user_key).first()
+        import hashlib
+        akey = db.session.query(Accesskey).filter(Accesskey.uuid == hashlib.sha256(user_key.encode()).hexdigest()).first()
+        if not akey:
+            return False
         now = datetime.now()
-        key_age = (now-akey.creation_date).seconds/60
+        key_age = (now-akey.creation_date).total_seconds()/60
         if key_age < akey.expiration_time:
             return True
         else:

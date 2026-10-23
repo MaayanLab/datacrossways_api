@@ -1,6 +1,7 @@
 import json
 import os
 import psycopg2
+import re
 
 
 def read_config():
@@ -18,6 +19,8 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 
 def print_table(table_name):
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table_name):
+        raise ValueError("Invalid table name")
     sql = "SELECT * FROM "+table_name
     cursor.execute(sql)
     conn.commit()

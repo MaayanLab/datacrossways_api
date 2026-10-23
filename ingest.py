@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import csv
 import io
+import re
 
 with open("secrets/config.json") as o:
 	config = json.loads(o.read())
@@ -41,6 +42,8 @@ connection = pg_connect()
 
 for table in tables:
 	df = pd.read_csv(f"data/{table}.tsv", sep="\t")
+	if not all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(col)) for col in df.columns):
+		raise ValueError(f"Invalid column name in {table} import")
 
 	cur = connection.cursor()
 	try:

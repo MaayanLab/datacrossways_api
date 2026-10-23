@@ -41,14 +41,14 @@ def sign_get_file(file_name, cred):
     )
     return url
 
-def sign_upload_file(file_name, cred):
+def sign_upload_file(file_name, cred, max_size):
 
     s3_client = get_aws_client(cred)
 
     response = s3_client.generate_presigned_post(cred["bucket"],
         file_name,
-        Fields=None,
-        Conditions=None,
+        Fields={},
+        Conditions=[["content-length-range", 1, int(max_size)]],
         ExpiresIn=600)
 
     return response
@@ -75,9 +75,9 @@ def complete_multipart(filename, upload_id, parts, cred):
         MultipartUpload={'Parts': parts},
         UploadId=upload_id)
 
-def get_file_size(filename):
-    s3_client = get_aws_client(app.conf["aws"])
-    response = s3_client.head_object(Bucket='mssm-test', Key='kWbmk5955QM7/kallisto')
+def get_file_size(filename, cred):
+    s3_client = get_aws_client(cred)
+    response = s3_client.head_object(Bucket=cred["bucket"], Key=filename)
     return response['ContentLength']
 
 def get_file_checksum(filename):

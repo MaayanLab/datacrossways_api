@@ -13,11 +13,15 @@ conf = read_config()
 def dev_login(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if conf.get("development", False) == True:
+        if conf.get("development", False) is True and request.remote_addr in {"127.0.0.1", "::1"}:
             user = dbutils.get_dev_login_user()
             if user:
                 session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-                session.permanent = True
+                session.permanent = False
+                try:
+                    return f(*args, **kwargs)
+                finally:
+                    session.pop("user", None)
         return f(*args, **kwargs)
     return decorated_function
 

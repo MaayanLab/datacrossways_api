@@ -1,4 +1,4 @@
-from flask import Flask, url_for, redirect, session, request, jsonify, Response
+from flask import Flask, url_for, redirect, session, request, jsonify, Response, abort
 import traceback
 import json
 import requests
@@ -33,16 +33,20 @@ class IntListConverter(BaseConverter):
         return ','.join(str(x) for x in value)
 
 import logging
+import os
+from collections import defaultdict, deque
+from threading import Lock
+from urllib.parse import urlsplit
 import sys
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=os.environ.get("LOG_LEVEL", "INFO").upper())
 
 # Get the 'werkzeug' logger specifically
 log = logging.getLogger('werkzeug')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 # Create a StreamHandler for stdout
 handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
+handler.setLevel(logging.INFO)
 log.addHandler(handler)
 
 def read_config():
@@ -54,18 +58,54 @@ app = Flask(__name__,
         static_folder='static',
         template_folder='templates')
 
-cors = CORS(app, resources={r"/*": {"origins": "*"}})
-app.secret_key = "ffx#xkj$WWs2"
+conf = read_config()
+public_origin = conf["redirect"]["url"].rstrip("/")
+cors = CORS(app, resources={r"/api/*": {"origins": [public_origin]}})
+app.secret_key = os.environ.get("FLASK_SECRET_KEY")
+if not app.secret_key or len(app.secret_key) < 32:
+    raise RuntimeError("FLASK_SECRET_KEY must be set to at least 32 characters")
 app.config['SESSION_COOKIE_NAME'] = 'google-login-session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = public_origin.startswith("https://")
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 app.url_map.converters['int_list'] = IntListConverter
 
-cache = Cache(app, config={"CACHE_TYPE": "simple"})
+cache = Cache(app, config={"CACHE_TYPE": "SimpleCache"})
 
-conf = read_config()
+MAX_BATCH_IDS = 100
+rate_windows = defaultdict(deque)
+rate_lock = Lock()
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://"+conf["database"]["user"]+":"+conf["database"]["pass"]+"@"+conf["database"]["server"]+":"+conf["database"]["port"]+"/"+conf["database"]["name"]
+def pagination(default_limit=20, max_limit=100):
+    offset = max(int(request.args.get("offset", 0)), 0)
+    limit = min(max(int(request.args.get("limit", default_limit)), 1), max_limit)
+    return offset, limit
+
+@app.before_request
+def enforce_request_security():
+    if request.content_length and request.content_length > 2 * 1024 * 1024:
+        abort(413)
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and "user" in session and not request.headers.get("x-api-key"):
+        origin = request.headers.get("Origin")
+        if not origin and request.headers.get("Referer"):
+            referer = urlsplit(request.headers["Referer"])
+            origin = f"{referer.scheme}://{referer.netloc}"
+        if not origin or origin.rstrip("/") != public_origin:
+            abort(403, description="Cross-origin state-changing request rejected")
+    if request.path.startswith(("/api/user/login/", "/api/user/accesskey", "/api/file/upload", "/api/file/startmultipart", "/api/file/search")):
+        key = (request.remote_addr or "unknown", request.path)
+        now = time.monotonic()
+        with rate_lock:
+            window = rate_windows[key]
+            while window and window[0] < now - 60:
+                window.popleft()
+            if len(window) >= 60:
+                abort(429)
+            window.append(now)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://"+conf["database"]["user"]+":"+conf["database"]["pass"]+"@"+conf["database"]["server"]+":"+conf["database"]["port"]+"/"+conf["database"]["name"]
 app.config['SQLALCHEMY_POOL_SIZE'] = 40
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -161,8 +201,7 @@ def get_user():
 @login_required
 def get_user_files():
     try:
-        offset = request.args.get("offset", default=0)
-        limit = request.args.get("limit", default=20)
+        offset, limit = pagination()
         files, file_count = dbutils.list_user_files(session["user"]["id"], offset, limit)
         return jsonify({"message": "files listed successfully", "files": files, "total": file_count}), 200
     except Exception:
@@ -189,8 +228,7 @@ def get_user_storage():
 @login_required
 def get_user_collections():
     try:
-        offset = request.args.get("offset", default=0)
-        limit = request.args.get("limit", default=1000)
+        offset, limit = pagination(default_limit=100, max_limit=100)
         files, file_count = dbutils.list_user_collections(session["user"]["id"], offset, limit)
         return jsonify({"message": "files listed successfully", "collections": files, "offset": offset, "limit": limit, "total": file_count}), 200
     except Exception:
@@ -246,11 +284,11 @@ def patch_user():
         traceback.print_exc()
         return jsonify(message="An error occurred when updating user"), 500
 
+@app.route('/api/user/<int:user_id>', methods = ["DELETE"])
 @accesskey_login
 @dev_login
 @login_required
 @admin_required
-@app.route('/api/user/<int:user_id>', methods = ["DELETE"])
 def delete_user(user_id):
     try:
         user = dbutils.delete_user(user_id)
@@ -272,8 +310,7 @@ def delete_user(user_id):
 @login_required
 def get_file():
     try:
-        offset = int(request.args.get("offset", default=0))
-        limit = int(request.args.get("limit", default=20))
+        offset, limit = pagination()
         user = dict(session).get('user', None)
         files, file_count = dbutils.list_files(offset, limit, user_id=user["id"])
         return jsonify({"message": "files listed successfully", "files": files, "total_files": file_count})
@@ -287,8 +324,7 @@ def get_file():
 @login_required
 def get_file_detail():
     try:
-        offset = int(request.args.get("offset", default=0))
-        limit = int(request.args.get("limit", default=20))
+        offset, limit = pagination()
         user = dict(session).get('user', None)
         files, file_count = dbutils.list_files_detail(offset, limit, user_id=user["id"])
         return jsonify({"message": "files listed successfully", "files": files, "total": file_count})
@@ -303,8 +339,8 @@ def get_file_detail():
 def search_file():
     try:
         data = request.get_json()
-        offset = int(data.get("offset", 0))
-        limit = int(data.get("limit", 20))
+        offset = max(int(data.get("offset", 0)), 0)
+        limit = min(max(int(data.get("limit", 20)), 1), 100)
         fileinfo = data.get("file_info", None)
         owner_id = data.get("owner_id", None)
         collection_id = data.get("collection_id", None)
@@ -335,6 +371,7 @@ def get_filters():
 @accesskey_login
 @dev_login
 @login_required
+@upload_credentials
 def post_file():
     try:
         data = request.get_json()
@@ -351,7 +388,7 @@ def post_file():
 def patch_file():
     try:
         file = request.get_json()
-        dbutils.update_file(db, file)
+        dbutils.update_file(db, file, session["user"]["id"])
         return jsonify(message="file updated"), 200
     except Exception:
         traceback.print_exc()
@@ -364,8 +401,7 @@ def patch_file():
 @admin_required
 def get_file_log(file_id):
     try:
-        offset = int(request.args.get("offset", default=0))
-        limit = int(request.args.get("limit", default=20))
+        offset, limit = pagination()
         user = dict(session).get('user', None)
         files, log_count = dbutils.list_file_logs(offset, limit, file_id)
         return jsonify({"message": "file log listed successfully", "files": files, "total_logs": log_count})
@@ -380,8 +416,7 @@ def get_file_log(file_id):
 @admin_required
 def get_user_log(user_id):
     try:
-        offset = int(request.args.get("offset", default=0))
-        limit = int(request.args.get("limit", default=20))
+        offset, limit = pagination()
         files, log_count = dbutils.list_user_logs(offset, limit, user_id=user_id)
         return jsonify({"message": "logs listed successfully", "logs": files, "total_logs": log_count})
     except Exception:
@@ -405,6 +440,8 @@ def get_file_meta(file_id):
 @login_required
 def get_file_meta_list(file_ids):
     try:
+        if len(file_ids) > MAX_BATCH_IDS:
+            return jsonify(message="Too many file IDs"), 400
         metas = []
         for file_id in file_ids:
             metadata = dbutils.get_file_metadata(db, file_id, session["user"]["id"])
@@ -463,6 +500,8 @@ def download(fileid):
 @login_required
 def download_list(fileids):
     try:
+        if len(fileids) > MAX_BATCH_IDS:
+            return jsonify(message="Too many file IDs"), 400
         user = dict(session).get('user', None)
         url_list = []
         for fileid in fileids:
@@ -503,7 +542,7 @@ def upload():
         db_file = dbutils.create_file(db, data["filename"], data["size"], session["user"]["id"])
         # check whether user has rights to upload data
         # general upload rights, resource write credentials (e.g. user is allowed to write)
-        response = s3utils.sign_upload_file(db_file["uuid"]+"/"+data["filename"], conf["aws"])
+        response = s3utils.sign_upload_file(db_file["uuid"]+"/"+data["filename"], conf["aws"], data["size"])
         #dbutils.upload_complete_file
         return jsonify({"message": "URL signed", "url": response, "file": db_file}), 200
     except Exception:
@@ -533,6 +572,9 @@ def startmultipart():
 def signmultipart():
     try:
         data = request.get_json()
+        dbutils.authorize_upload_key(session["user"]["id"], data["filename"])
+        if not 1 <= int(data["part_number"]) <= 10000:
+            return jsonify(message="Invalid multipart part number"), 400
         url = s3utils.sign_multipart(data["filename"], data["upload_id"], data["part_number"], conf["aws"])
         return jsonify({'message': 'multipart upload URL signed', 'url': url}), 200 
     except Exception:
@@ -546,7 +588,12 @@ def signmultipart():
 def completemultipart():
     try:
         data = request.get_json()
+        db_file = dbutils.authorize_upload_key(session["user"]["id"], data["filename"])
+        if not isinstance(data.get("parts"), list) or not 1 <= len(data["parts"]) <= 10000:
+            return jsonify(message="Invalid multipart parts"), 400
         s3utils.complete_multipart(data["filename"], data["upload_id"], data["parts"], conf["aws"])
+        actual_size = s3utils.get_file_size(data["filename"], conf["aws"])
+        dbutils.finalize_upload(db_file.id, session["user"]["id"], actual_size)
         return jsonify({'message': 'multipart upload completed'}), 200
     except Exception:
         traceback.print_exc()
@@ -740,8 +787,7 @@ def get_collections_list(collection_ids):
 @login_required
 def get_collection_files(collection_id):
     try:
-        offset = int(request.args.get("offset", 0))
-        limit = int(request.args.get("limit", 20))
+        offset, limit = pagination()
         user = dict(session).get('user', None)
         collection = dbutils.get_collection_files(collection_id, offset, limit, user["id"])
         return jsonify(collection)
@@ -855,8 +901,8 @@ def keylogin():
 def search_user():
     try:
         data = request.get_json()
-        offset = int(data.get("offset", 0))
-        limit = int(data.get("limit", 20))
+        offset = max(int(data.get("offset", 0)), 0)
+        limit = min(max(int(data.get("limit", 20)), 1), 100)
         search = data.get("search", None)
         users, user_count = dbutils.search_user(search, offset, limit)
         return jsonify({"message": "users searched successfully", "users": users, "total": user_count})
@@ -870,8 +916,8 @@ def search_user():
 def search_collection():
     try:
         data = request.get_json()
-        offset = int(data.get("offset", 0))
-        limit = int(data.get("limit", 20))
+        offset = max(int(data.get("offset", 0)), 0)
+        limit = min(max(int(data.get("limit", 20)), 1), 100)
         search = data.get("search", None)
         user = dict(session).get('user', None)
         collections, collection_count = dbutils.search_collection(search, offset, limit, user["id"])
@@ -886,8 +932,8 @@ def search_collection():
 def search_role():
     try:
         data = request.get_json()
-        offset = int(data.get("offset", 0))
-        limit = int(data.get("limit", 20))
+        offset = max(int(data.get("offset", 0)), 0)
+        limit = min(max(int(data.get("limit", 20)), 1), 100)
         search = data.get("search", None)
         roles, role_count = dbutils.search_role(search, offset, limit)
         return jsonify({"message": "roles searched successfully", "roles": roles, "total": role_count})
@@ -902,8 +948,8 @@ def search_role():
 def search_policy():
     try:
         data = request.get_json()
-        offset = int(data.get("offset", 0))
-        limit = int(data.get("limit", 20))
+        offset = max(int(data.get("offset", 0)), 0)
+        limit = min(max(int(data.get("limit", 20)), 1), 100)
         search = data.get("search", None)
         policies, policy_count = dbutils.search_policy(search, offset, limit)
         return jsonify({"message": "policies searched successfully", "policies": policies, "total": policy_count})
@@ -956,7 +1002,7 @@ def logout():
 
 @app.route('/api/user/authorize')
 def authorize():
-    print(request.url)
+    # Callback URLs can contain authorization codes; never log them.
     provider = request.args.get('provider')
     redirect_endpoint = session.get('redirect_endpoint', None)
     if provider == "google":
@@ -964,7 +1010,8 @@ def authorize():
         token = google.authorize_access_token()
         response = google.get('userinfo', token=token)
         user_info = response.json()
-        print(user_info, flush=True)
+        if not user_info.get("verified_email", user_info.get("email_verified", False)):
+            abort(403, description="OAuth provider did not verify the email address")
     elif provider == "orcid":
         orcid = oauth.create_client("orcid")
         token = orcid.authorize_access_token()
@@ -981,8 +1028,10 @@ def authorize():
     session.permanent = True
     # do something with the token and profile
     #return redirect('/')
-    if redirect_endpoint != None:
-        redirect(conf["redirect"]["url"]+'/'+redirect_endpoint)
+    if redirect_endpoint:
+        safe_endpoint = redirect_endpoint.lstrip("/")
+        if "://" not in safe_endpoint and not safe_endpoint.startswith("//"):
+            return redirect(conf["redirect"]["url"]+'/'+safe_endpoint)
     return redirect(conf["redirect"]["url"]+'/search')
 
 @app.route('/api/user/i', methods = ['GET'])
@@ -1052,9 +1101,8 @@ def proxy(*args, **kwargs):
         # Forwarding Brotli through unmodified left `resp.content` as
         # still-compressed bytes served with no Content-Encoding header,
         # i.e. raw binary in the browser.
-        headers={key: value for (key, value) in request.headers if key.lower() not in ('host', 'accept-encoding')},
+        headers={key: value for (key, value) in request.headers if key.lower() not in ('host', 'accept-encoding', 'cookie', 'authorization', 'x-api-key')},
         data=request.get_data(),
-        cookies=request.cookies,
         allow_redirects=False)
 
     excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
