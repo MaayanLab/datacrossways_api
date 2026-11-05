@@ -1,7 +1,6 @@
-from flask import Flask, url_for, redirect, session, request, jsonify, Response, abort
+from flask import Flask, url_for, redirect, session, request, jsonify, Response, abort, g
 import traceback
 import json
-import requests
 import time
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -68,6 +67,8 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 conf = read_config()
 public_origin = conf["redirect"]["url"].rstrip("/")
 cors = CORS(app, resources={r"/api/*": {"origins": [public_origin]}})
+if conf.get("development") and public_origin.startswith("https://"):
+    raise RuntimeError("DEVELOPMENT=true grants admin access without login and must not be used with an https (production) PUBLIC_BASE_URL")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 if not app.secret_key or len(app.secret_key) < 32:
     raise RuntimeError("FLASK_SECRET_KEY must be set to at least 32 characters")
@@ -92,27 +93,56 @@ def pagination(default_limit=20, max_limit=100):
     limit = min(max(int(request.args.get("limit", default_limit)), 1), max_limit)
     return offset, limit
 
+RATE_LIMIT_PER_MINUTE = 60
+RATE_LIMITED_PREFIXES = (
+    "/api/user/login/", "/api/user/accesskey", "/api/file/upload", "/api/file/startmultipart",
+    "/api/file/search", "/api/file/filter", "/api/collection/search",
+)
+RATE_TABLE_MAX_KEYS = 10000
+
+def rate_limit_bucket():
+    """Return the fixed bucket name a request counts against, or None.
+
+    Buckets are a small closed set (never the raw URL), so unknown paths cannot
+    be used to create unbounded rate-limiter state.
+    """
+    for prefix in RATE_LIMITED_PREFIXES:
+        if request.path.startswith(prefix):
+            return prefix
+    if request.method == "POST" and request.path == "/api/file":
+        return "POST /api/file"
+    return None
+
+def check_rate_limit(bucket):
+    key = (request.remote_addr or "unknown", bucket)
+    now = time.monotonic()
+    with rate_lock:
+        if len(rate_windows) > RATE_TABLE_MAX_KEYS:
+            for stale in [k for k, w in rate_windows.items() if not w or w[-1] < now - 60]:
+                del rate_windows[stale]
+        window = rate_windows[key]
+        while window and window[0] < now - 60:
+            window.popleft()
+        if len(window) >= RATE_LIMIT_PER_MINUTE:
+            abort(429)
+        window.append(now)
+
 @app.before_request
 def enforce_request_security():
     if request.content_length and request.content_length > 2 * 1024 * 1024:
         abort(413)
-    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and "user" in session and not request.headers.get("x-api-key"):
+    # Any request authenticated by the browser's session cookie must come from
+    # our own origin, whether or not an unrelated x-api-key header is attached.
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and "user" in session:
         origin = request.headers.get("Origin")
         if not origin and request.headers.get("Referer"):
             referer = urlsplit(request.headers["Referer"])
             origin = f"{referer.scheme}://{referer.netloc}"
         if not origin or origin.rstrip("/") != public_origin:
             abort(403, description="Cross-origin state-changing request rejected")
-    if request.path.startswith(("/api/user/login/", "/api/user/accesskey", "/api/file/upload", "/api/file/startmultipart", "/api/file/search")):
-        key = (request.remote_addr or "unknown", request.path)
-        now = time.monotonic()
-        with rate_lock:
-            window = rate_windows[key]
-            while window and window[0] < now - 60:
-                window.popleft()
-            if len(window) >= 60:
-                abort(429)
-            window.append(now)
+    bucket = rate_limit_bucket()
+    if bucket:
+        check_rate_limit(bucket)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = URL.create(
     "postgresql+psycopg2",
@@ -323,6 +353,8 @@ def delete_user(user_id):
     try:
         user = dbutils.delete_user(user_id)
         return jsonify({"message": "user deleted successfully", "user": user}), 203
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 400
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when deleting user"), 500
@@ -344,20 +376,6 @@ def get_file():
         user = dict(session).get('user', None)
         files, file_count = dbutils.list_files(offset, limit, user_id=user["id"])
         return jsonify({"message": "files listed successfully", "files": files, "total_files": file_count})
-    except Exception:
-        traceback.print_exc()
-        return jsonify(message="An error occurred when listing files"), 500
-
-@app.route('/api/file/detail', methods = ["GET"])
-@accesskey_login
-@dev_login
-@login_required
-def get_file_detail():
-    try:
-        offset, limit = pagination()
-        user = dict(session).get('user', None)
-        files, file_count = dbutils.list_files_detail(offset, limit, user_id=user["id"])
-        return jsonify({"message": "files listed successfully", "files": files, "total": file_count})
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when listing files"), 500
@@ -817,9 +835,15 @@ def get_collection_by_id(collection_id):
     try:
         user = dict(session).get('user', None)
         collection = dbutils.get_collection(collection_id, user["id"])
+        if collection is None:
+            return jsonify(message="Collection not found"), 404
         return jsonify(collection)
+    except PermissionError:
+        # Same answer as a missing collection so hidden ones are not revealed.
+        return jsonify(message="Collection not found"), 404
     except Exception:
         traceback.print_exc()
+        return jsonify(message="An error occurred when retrieving collection"), 500
 
 
 @app.route('/api/collection/<int_list:collection_ids>', methods = ["GET"])
@@ -828,13 +852,19 @@ def get_collection_by_id(collection_id):
 @login_required
 def get_collections_list(collection_ids):
     try:
+        if len(collection_ids) > MAX_BATCH_IDS:
+            return jsonify(message="Too many collection IDs"), 400
         collections = []
         user = dict(session).get('user', None)
         for collection_id in collection_ids:
-            collection = dbutils.get_collection(collection_id, user["id"])
+            try:
+                collection = dbutils.get_collection(collection_id, user["id"])
+            except PermissionError:
+                collection = None
             collections.append(collection)
         return jsonify(collections=collections), 200
     except Exception:
+        traceback.print_exc()
         return jsonify(message="An error occurred when retrieving collections"), 500
 
 
@@ -850,6 +880,7 @@ def get_collection_files(collection_id):
         return jsonify(collection)
     except Exception:
         traceback.print_exc()
+        return jsonify(message="An error occurred when retrieving collection files"), 500
 
 @app.route('/api/collection', methods = ["POST"])
 @accesskey_login
@@ -861,6 +892,10 @@ def post_collection():
         data = request.get_json()
         collection = dbutils.create_collection(data, user["id"])
         return jsonify({"message": "collections created successfully", "collection": collection})
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 400
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to create collection"), 500
@@ -875,6 +910,10 @@ def patch_collection():
         user = dict(session).get('user', None)
         collection = dbutils.update_collection(data, user["id"])
         return jsonify({"message": "collection updated successfully", "collection": collection})
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 400
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to update collection"), 500
@@ -917,6 +956,8 @@ def get_access_keys():
 @dev_login
 @login_required
 def post_access_key(expiration):
+    if g.get("api_key_auth"):
+        return jsonify(message="API keys cannot create new API keys; sign in with the browser"), 403
     try:
         user = dict(session).get('user', None)
         key = dbutils.create_access_key(user["id"], expiration)
@@ -940,15 +981,6 @@ def delete_access_key(akey):
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when deleting key"), 500
-
-@app.route('/api/user/keylogin', methods=["GET"])
-@accesskey_login
-@dev_login
-@login_required
-def keylogin():
-    user = dbutils.get_key_user(user_key)
-    session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-    session.permanent = True
 
 @app.route('/api/user/search', methods=["POST"])
 @accesskey_login
@@ -1016,20 +1048,6 @@ def search_policy():
         traceback.print_exc()
         return jsonify(message="An error occurred when searching policies"), 500
 
-@app.route('/api/news', methods=["GET"])
-@cache.cached(timeout=360)
-def get_news():
-    url = "https://api.twitter.com/2/users/"+str(conf["social"]["twitter"]["account_id"])+"/tweets?tweet.fields=created_at,public_metrics"
-    headers = {
-        "Authorization": "Bearer "+conf["social"]["twitter"]["bearer_token"]
-    }
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        return response.json(), 200
-    else:
-        return jsonify(message="An error occurred when getting news"), 500
-
 # ------------------ Login/Logout ----------------
 @app.route('/api/user/login/google')
 def login():
@@ -1055,6 +1073,15 @@ def login_orcid():
 @accesskey_login
 @login_required
 def logout():
+    if request.method == 'GET':
+        # Block forced logout from other sites (link / <img> / redirect).
+        if request.headers.get("Sec-Fetch-Site", "same-origin") not in {"same-origin", "none"}:
+            abort(403, description="Cross-site logout rejected")
+        referer = request.headers.get("Referer")
+        if referer:
+            ref = urlsplit(referer)
+            if f"{ref.scheme}://{ref.netloc}" != public_origin:
+                abort(403, description="Cross-site logout rejected")
     for key in list(session.keys()):
         session.pop(key)
     if request.method == 'POST':
@@ -1141,40 +1168,5 @@ def list_projects():
     # visitor never gets a working link.
     user = dict(session).get('user', None)
     collections = dbutils.list_collections(user["id"]) if user else []
-    all_collections = [{"id": c.id, "name": c.name, "project_id": c.project_id} for c in Collection.query.all()]
+    all_collections = [{"id": c.id, "name": c.name, "project_id": c.project_id} for c in Collection.query.order_by(Collection.id).all()]
     return jsonify(projects=projects_data.get_projects(collections=collections, all_collections=all_collections))
-
-# ----------- Proxy to next.js frontend -----------
-
-@app.route('/favicon.ico')
-def nothing():
-    return Response()
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def proxy(*args, **kwargs):
-    # nginx already sends /api/ traffic here. Proxying an unknown API route
-    # back to nginx creates a request loop that exhausts the worker threads.
-    if request.path == '/api' or request.path.startswith('/api/'):
-        abort(404)
-    resp = requests.request(
-        method=request.method,
-        url=request.url.replace(request.host_url, conf["frontend"]["url"]),
-        # Drop the browser's Accept-Encoding (which may request Brotli) so
-        # the frontend dev server responds with gzip/deflate instead -
-        # formats `requests` can always decode without extra dependencies.
-        # Forwarding Brotli through unmodified left `resp.content` as
-        # still-compressed bytes served with no Content-Encoding header,
-        # i.e. raw binary in the browser.
-        headers={key: value for (key, value) in request.headers if key.lower() not in ('host', 'accept-encoding', 'cookie', 'authorization', 'x-api-key')},
-        data=request.get_data(),
-        allow_redirects=False,
-        timeout=(3.05, 10))
-
-    excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
-    headers = [(name, value) for (name, value) in resp.raw.headers.items()
-               if name.lower() not in excluded_headers]
-
-    response = Response(resp.content, resp.status_code, headers)
-    return response
-

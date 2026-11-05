@@ -1,3 +1,4 @@
+import threading
 import boto3
 import json
 import app
@@ -5,8 +6,6 @@ from botocore.config import Config
 from datetime import datetime, timezone, timedelta
 
 def delete_file(file_uuid, file_name):
-    print(file_uuid)
-    print(file_name)
     s3_client = get_aws_client(app.conf["aws"])
     s3_client.delete_objects(
         Bucket=app.conf["aws"]["bucket"],
@@ -20,7 +19,21 @@ def delete_file(file_uuid, file_name):
         }
     )
 
+_client_cache = {}
+_client_lock = threading.Lock()
+
 def get_aws_client(cred):
+    # boto3 clients are thread-safe and expensive to build (credential and
+    # endpoint resolution); the background jobs would otherwise create one per
+    # file every few seconds.
+    cache_key = tuple(cred.get(k) for k in ("addressing_style", "region", "endpoint_url", "aws_id", "aws_key"))
+    with _client_lock:
+        client = _client_cache.get(cache_key)
+        if client is None:
+            client = _client_cache[cache_key] = _build_aws_client(cred)
+    return client
+
+def _build_aws_client(cred):
     addressing_style = cred.get("addressing_style", "auto")
     if addressing_style not in {"auto", "path", "virtual"}:
         raise ValueError("S3 addressing style must be auto, path, or virtual")

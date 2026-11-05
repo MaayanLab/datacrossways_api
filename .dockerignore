@@ -6,3 +6,7 @@ secrets
 test
 datacrossways
 requirements_old*.txt
+createdb.py
+dbsetup.py
+ingest.py
+db

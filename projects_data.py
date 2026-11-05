@@ -91,7 +91,10 @@ def _attach_collection_links(projects, collections, all_collections):
         for collection in collection_list or []:
             key = (collection.get("project_id") or "").strip().lower()
             if key:
-                index[key] = collection
+                # First match wins (callers pass collections ordered by id) so
+                # a later collection reusing a project code cannot take over
+                # the link.
+                index.setdefault(key, collection)
         return index
 
     accessible_index = _index_by_project_id(collections)

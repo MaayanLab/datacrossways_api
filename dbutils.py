@@ -1,10 +1,13 @@
+import os
+import threading
 import traceback
+from urllib.parse import urlsplit
 from app import db, session, User, File, Collection, DownloadLog, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import json
 import jsonschema
 from jsonschema import validate
 import s3utils
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import joinedload
 from sqlalchemy.types import Integer, Float
 from sqlalchemy import func
@@ -17,29 +20,63 @@ from functools import lru_cache
 import functools
 import re
 
+MAX_PENDING_UPLOADS = 100
+ALLOWED_VISIBILITY = {"hidden", "visible"}
+ALLOWED_ACCESSIBILITY = {"locked", "open"}
+# Hosts a non-admin may point a collection image at. Any other host would let a
+# user make every visitor's browser contact a server they control.
+COLLECTION_IMAGE_HOSTS = {h.strip().lower() for h in
+                          os.environ.get("COLLECTION_IMAGE_HOSTS", "datacrosswayspublic.s3.amazonaws.com").split(",")
+                          if h.strip()}
+
+
 class TimedCache(object):
-    def __init__(self, timeout=1):
+    """Small TTL cache with a hard size bound so request-controlled arguments
+    (search queries, filter parameters) cannot grow process memory forever."""
+
+    def __init__(self, timeout=1, max_entries=512):
         self.timeout = timeout
+        self.max_entries = max_entries
         self.cache = {}
         self.timers = {}
+        self.lock = threading.Lock()
+
+    def _evict(self, now):
+        # Called with the lock held. Drop expired entries first, then the
+        # oldest ones until there is room for one more.
+        for key in [k for k, t in self.timers.items() if now - t > self.timeout]:
+            self.cache.pop(key, None)
+            self.timers.pop(key, None)
+        while len(self.cache) >= self.max_entries:
+            oldest = min(self.timers, key=self.timers.get)
+            self.cache.pop(oldest, None)
+            self.timers.pop(oldest, None)
 
     def __call__(self, f):
         @functools.wraps(f)
         def wrap(*args, **kwargs):
             now = time.time()
-            args_key = tuple(json.dumps(arg, sort_keys=True) if isinstance(arg, dict) else arg for arg in args)
-            if args_key not in self.cache or now - self.timers[args_key] > self.timeout:
-                result = f(*args, **kwargs)
+            try:
+                args_key = json.dumps([args, sorted(kwargs.items())], sort_keys=True, default=str)
+            except (TypeError, ValueError):
+                return f(*args, **kwargs)
+            with self.lock:
+                if args_key in self.cache and now - self.timers[args_key] <= self.timeout:
+                    return self.cache[args_key]
+            result = f(*args, **kwargs)
+            with self.lock:
+                if args_key not in self.cache:
+                    self._evict(now)
                 self.cache[args_key] = result
                 self.timers[args_key] = now
-                return result
-            return self.cache[args_key]
+            return result
         wrap.cache_clear = self.clear
         return wrap
 
     def clear(self):
-        self.cache.clear()
-        self.timers.clear()
+        with self.lock:
+            self.cache.clear()
+            self.timers.clear()
 
 @TimedCache(timeout=60)
 def is_admin(user_id):
@@ -59,17 +96,15 @@ def is_uploader(user_id):
 
 def is_owner_file(user_id, file_id):
     file = get_file(file_id)
-    if file.owner_id == user_id:
-        return True
-    else:
-        return False
+    return file is not None and file.owner_id == user_id
 
 def is_owner_key(user_id, key_id):
     db_access_key = db.session.query(Accesskey).filter(Accesskey.id == key_id).first()
-    if db_access_key.owner_id == user_id:
-        return True
-    else:
-        return False
+    return db_access_key is not None and db_access_key.owner_id == user_id
+
+def user_exists(user_id):
+    """Uncached on purpose: a deleted account must lose access immediately."""
+    return db.session.query(User.id).filter(User.id == user_id).first() is not None
 
 def get_stats():
     file_count = db.session.query(File.id).count()
@@ -179,8 +214,10 @@ def create_users_bulk(user_info):
                 db.session.refresh(user)
                 user_success.append(print_user(user))
             except Exception:
+                db.session.rollback()
                 traceback.print_exc()
-                u["error"] = traceback.format_exc()
+                # Details stay in the server log; never return stack traces.
+                u["error"] = "user could not be created"
                 user_failed.append(u)
         else:
             u["error"] = "user email already exists"
@@ -211,10 +248,45 @@ def create_user(user_info):
         raise Exception("User already exists")
 
 def delete_user(user_id):
+    """Delete an account together with everything it owns.
+
+    The user's own files are removed (including the stored objects). Other
+    people's files and sub-collections that sit inside the user's collections
+    are moved to the root collection instead of being destroyed.
+    """
     dbuser = db.session.query(User).filter(User.id == user_id).first()
+    if dbuser is None:
+        raise ValueError("User does not exist")
+    root = db.session.query(Collection).filter(Collection.id == 1).first()
+    if root is not None and root.owner_id == user_id:
+        raise ValueError("The owner of the root collection cannot be deleted")
+    if any(r.name == "admin" for r in dbuser.roles):
+        admin_count = (db.session.query(UserRole)
+                       .join(Role, Role.id == UserRole.role_id)
+                       .filter(Role.name == "admin").count())
+        if admin_count <= 1:
+            raise ValueError("The last administrator cannot be deleted")
     r = print_user(dbuser)
-    User.query.filter_by(id=user_id).delete()
+
+    for db_file in db.session.query(File).filter(File.owner_id == user_id).all():
+        try:
+            s3utils.delete_file(db_file.uuid, db_file.name)
+        except Exception:
+            traceback.print_exc()
+        db.session.delete(db_file)
+    db.session.flush()
+
+    for collection in db.session.query(Collection).filter(Collection.owner_id == user_id).all():
+        db.session.execute(update(File).where(File.collection_id == collection.id).values(collection_id=1))
+        db.session.execute(update(Collection).where(Collection.parent_collection_id == collection.id).values(parent_collection_id=1))
+        db.session.flush()
+        db.session.query(Collection).filter(Collection.id == collection.id).delete(synchronize_session=False)
+
+    db.session.query(Accesskey).filter(Accesskey.owner_id == user_id).delete(synchronize_session=False)
+    db.session.query(UserRole).filter(UserRole.user_id == user_id).delete(synchronize_session=False)
+    db.session.query(User).filter(User.id == user_id).delete(synchronize_session=False)
     db.session.commit()
+    invalidate_authz_caches()
     return(r)
 
 def search_user(search, offset, limit):
@@ -332,6 +404,19 @@ def is_valid_email(email):
 def update_user(user, user_id=None):
     if user_id == user["id"] or is_admin(user_id):
         dbuser = db.session.query(User).filter(User.id == user["id"]).first()
+        if dbuser is None:
+            raise ValueError("User does not exist")
+        # Login matches accounts by email / ORCID iD, so letting a user edit
+        # these would let them squat on an identity that has not signed up yet
+        # (account pre-hijacking). Only administrators may change them; an
+        # unchanged value (the profile form re-sends it) is ignored.
+        if not is_admin(user_id):
+            if "email" in user and user["email"] != dbuser.email:
+                raise PermissionError("Only administrators can change the email address")
+            if "orcid_id" in user and (user["orcid_id"] or None) != (dbuser.orcid_id or None):
+                raise PermissionError("Only administrators can change the ORCID iD")
+            user.pop("email", None)
+            user.pop("orcid_id", None)
         user.pop("creation_date", None)
         user.pop("uuid", None)
         user.pop("id", None)
@@ -351,8 +436,13 @@ def update_user(user, user_id=None):
             dbuser.first_name = user["first_name"]
         if "last_name" in user:
             dbuser.last_name = user["last_name"]
-        if "email" in user and is_valid_email(user["email"]):
-            dbuser.email = user["email"] 
+        if "email" in user:
+            if not isinstance(user["email"], str) or not is_valid_email(user["email"]):
+                raise ValueError("Invalid email address")
+            other = db.session.query(User).filter(User.email == user["email"], User.id != dbuser.id).first()
+            if other is not None:
+                raise ValueError("Email address is already in use")
+            dbuser.email = user["email"]
         if "affiliation" in user:
             dbuser.affiliation = user["affiliation"]
         if "storage_quota" in user:
@@ -363,7 +453,7 @@ def update_user(user, user_id=None):
                 raise ValueError("Storage quota must be an integer between 0 and 10485760 MB")
             dbuser.storage_quota = quota
         if "orcid_id" in user:
-            if len(user["orcid_id"]) > 0:
+            if isinstance(user["orcid_id"], str) and len(user["orcid_id"]) > 0:
                 dbuser.orcid_id = user["orcid_id"]
 
         db.session.commit()
@@ -481,6 +571,10 @@ def create_file(db, file_name, file_size, user_id):
     if not isinstance(file_size, int) or file_size <= 0:
         raise ValueError("Invalid file size")
     user = db.session.query(User).filter(User.id == user_id).first()
+    pending = (db.session.query(File).filter(File.owner_id == user.id, File.status == "uploading",
+                                             File.creation_date > datetime.now() - timedelta(hours=24)).count())
+    if pending >= MAX_PENDING_UPLOADS:
+        raise Exception("Too many unfinished uploads. Finish or delete them before starting new ones.")
     total_file_size = db.session.query(func.sum(File.size)).filter(File.owner_id == user.id).scalar() or 0
     total_file_size += file_size
     total_file_size = total_file_size/(1024*1024)
@@ -557,8 +651,8 @@ def download_file(file_id, user_id):
     return down_file
 
 def delete_file(file_id, user):
-    if is_admin(user["id"]) or is_owner_file(user["id"], file_id):
-        file = File.query.filter_by(id=file_id).first()
+    file = File.query.filter_by(id=file_id).first()
+    if file is not None and (is_admin(user["id"]) or file.owner_id == user["id"]):
         s3utils.delete_file(file.uuid, file.name)
         db.session.delete(file)
         db.session.commit()
@@ -933,11 +1027,55 @@ def list_collections(user_id):
         user_id,
     ) for collection in db_collections]
 
+def _check_collection_fields(fields, user_id, current=None):
+    """Validate the security-relevant collection fields.
+
+    Values equal to the stored ones are always accepted (forms re-send them
+    unchanged). Making a collection public, linking it to a project, or setting
+    its image are restricted so ordinary accounts cannot publish content to the
+    public showcase or the Projects page.
+    """
+    def changed(name):
+        return name in fields and (current is None or fields[name] != getattr(current, name))
+
+    privileged = is_admin(user_id) or is_uploader(user_id)
+    if "visibility" in fields and fields["visibility"] not in ALLOWED_VISIBILITY:
+        raise ValueError("Invalid collection visibility")
+    if "accessibility" in fields and fields["accessibility"] not in ALLOWED_ACCESSIBILITY:
+        raise ValueError("Invalid collection accessibility")
+    if changed("visibility") and fields["visibility"] == "visible" and not privileged:
+        raise PermissionError("Only uploaders and administrators can make a collection visible")
+    for text_field in ("name", "description"):
+        if text_field in fields and fields[text_field] is not None and (
+                not isinstance(fields[text_field], str) or len(fields[text_field]) > 5000):
+            raise ValueError(f"Invalid collection {text_field}")
+
+    if changed("project_id"):
+        project_id = fields["project_id"] or None
+        if project_id is not None:
+            if not privileged:
+                raise PermissionError("Only uploaders and administrators can link a collection to a project")
+            if not isinstance(project_id, str) or len(project_id) > 100:
+                raise ValueError("Invalid project id")
+            clash = db.session.query(Collection).filter(
+                func.lower(Collection.project_id) == project_id.strip().lower())
+            if current is not None:
+                clash = clash.filter(Collection.id != current.id)
+            if clash.first() is not None and not is_admin(user_id):
+                raise ValueError("That project is already linked to another collection")
+
+    if changed("image_url") and fields["image_url"]:
+        url = urlsplit(str(fields["image_url"]))
+        if url.scheme != "https" or not url.hostname:
+            raise ValueError("Collection images must use https")
+        if not is_admin(user_id) and url.hostname.lower() not in COLLECTION_IMAGE_HOSTS:
+            raise PermissionError("Collection images must be hosted on an approved host")
+
 def create_collection(collection, user_id):
-    collection.pop("collections", None)
-    collection.pop("files", None)
-    collection.pop("id", None)
-    collection.pop("uuid", None)
+    allowed = {"name", "description", "image_url", "visibility", "accessibility",
+               "project_id", "parent_collection_id"}
+    collection = {k: v for k, v in collection.items() if k in allowed}
+    _check_collection_fields(collection, user_id)
     collection["owner_id"] = user_id
     if "parent_collection_id" in collection:
         parent = db.session.query(Collection).filter(Collection.id == collection["parent_collection_id"]).first()
@@ -957,7 +1095,10 @@ def create_collection(collection, user_id):
 
 def update_collection(collection, user_id):
     dbcollection = db.session.query(Collection).filter(Collection.id == collection["id"]).first()
+    if dbcollection is None:
+        raise ValueError("Collection does not exist")
     if dbcollection.owner_id == user_id or is_admin(user_id):
+        _check_collection_fields(collection, user_id, dbcollection)
         #dbroot = db.session.query(Collection).filter(Collection.id == 1).first()
         collection.pop("creation_date", None)
         collection.pop("uuid", None)
@@ -1102,8 +1243,22 @@ def get_collection(collection_id, user_id):
         "accessibility": collection.accessibility,
         "visibility": collection.visibility,
         "project_id": collection.project_id,
-        "path": get_parent_collection_path(collection_id),
+        "path": _redact_collection_path(get_parent_collection_path(collection_id), user_id, is_user_admin, allowed_ids),
     }
+
+def _redact_collection_path(path, user_id, is_user_admin, allowed_ids):
+    """Hide the name/description of ancestor collections the caller may not see."""
+    if is_user_admin or not path:
+        return path
+    rows = {c.id: c for c in db.session.query(Collection).filter(Collection.id.in_([p["id"] for p in path])).all()}
+    redacted = []
+    for entry in path:
+        c = rows.get(entry["id"])
+        if c is not None and (c.owner_id == user_id or c.visibility != "hidden" or c.id in allowed_ids):
+            redacted.append(entry)
+        else:
+            redacted.append({"id": entry["id"], "name": "(restricted)", "description": None, "uuid": None})
+    return redacted
 
 def get_collection_old(collection_id, user_id):
     (list_creds, read_creds, write_creds) = get_scope(user_id)
@@ -1230,7 +1385,19 @@ def update_file(db, file, user_id):
     if db_file.owner_id != user_id and db_file.id not in file_write_creds and db_file.collection_id not in write_creds and not is_admin(user_id):
         raise PermissionError("No permission to update file")
     
+    # Write access granted through a policy lets someone curate a file's name
+    # and metadata. Changing who can see or download it, or where it lives, is
+    # the owner's decision (or an administrator's).
+    owner_or_admin = db_file.owner_id == user_id or is_admin(user_id)
+    for restricted in ("visibility", "accessibility", "status"):
+        if restricted in file and file[restricted] != getattr(db_file, restricted) and not owner_or_admin:
+            raise PermissionError(f"Only the file owner or an administrator can change {restricted}")
+    if "collection_id" in file and file["collection_id"] != db_file.collection_id and not owner_or_admin:
+        raise PermissionError("Only the file owner or an administrator can move a file")
+
     if "display_name" in file:
+        if not isinstance(file["display_name"], str) or len(file["display_name"]) > 512:
+            raise ValueError("Invalid display name")
         db_file.display_name = file["display_name"]
     if "owner_id" in file and is_admin(user_id):
         db_file.owner_id = file["owner_id"]
@@ -1260,7 +1427,9 @@ def update_file(db, file, user_id):
     db.session.commit()
 
 def file_checksum_status():
-    db_files = db.session.query(File).filter(File.checksum == "").all()
+    # Bounded batch, oldest first: unfinished uploads must not turn each run
+    # into an unbounded burst of S3 requests.
+    db_files = db.session.query(File).filter(File.checksum == "").order_by(File.id).limit(100).all()
     for db_file in db_files:
         try:
             checksum = s3utils.get_file_checksum(f"{db_file.uuid}/{db_file.name}")
@@ -1544,8 +1713,15 @@ def get_file_metadata(db, file_id, user_id):
     if not file:
         raise ValueError("File does not exist")
     if not can_read_file(file, user_id):
-        raise PermissionError("No permission to read file metadata")
+        _deny_file_access(file, user_id, "No permission to read file metadata")
     return file.meta
+
+def _deny_file_access(file, user_id, message):
+    """Answer "does not exist" for files the caller may not even list, so
+    hidden files cannot be told apart from missing ones."""
+    if not can_list_file(file, user_id):
+        raise ValueError("File does not exist")
+    raise PermissionError(message)
 
 def get_file_by_id(file_id, user_id):
     file = db.session.query(File, User, Collection).filter(File.id == file_id).filter(User.id == File.owner_id).filter(Collection.id == File.collection_id).first()
@@ -1553,7 +1729,7 @@ def get_file_by_id(file_id, user_id):
         raise ValueError("File does not exist")
     caller_id = user_id["id"] if isinstance(user_id, dict) else user_id
     if not can_read_file(file[0], caller_id):
-        raise PermissionError("No permission to read file")
+        _deny_file_access(file[0], caller_id, "No permission to read file")
     owner = file[1]
     collection = file[2]
     owner_result = {"first_name": owner.first_name, "last_name": owner.last_name, "id": owner.id, "uuid": owner.uuid}

@@ -60,6 +60,13 @@ if os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")
         }
     }
 
+if config["database"]["server"] != "postgres" and config["database"]["sslmode"] in {"disable", "allow", "prefer", "require"}:
+    print(
+        f"WARNING: DB_SSLMODE={config['database']['sslmode']} does not verify the database server's certificate; "
+        "use verify-full for external PostgreSQL.",
+        file=sys.stderr,
+    )
+
 os.makedirs("/app/secrets", exist_ok=True)
 with open("/app/secrets/config.json", "w", encoding="utf-8") as config_file:
     json.dump(config, config_file, indent=2)
