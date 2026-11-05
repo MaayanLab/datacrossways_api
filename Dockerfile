@@ -24,4 +24,4 @@ USER 10001
 EXPOSE 5000
 
 ENTRYPOINT ["python", "/usr/local/bin/docker-entrypoint.py"]
-CMD ["gunicorn", "--bind=0.0.0.0:5000", "--workers=1", "--threads=8", "--timeout=120", "app:app"]
+CMD ["gunicorn", "--bind=0.0.0.0:5000", "--workers=1", "--threads=8", "--timeout=120", "--no-control-socket", "app:app"]

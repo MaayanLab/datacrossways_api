@@ -11,6 +11,7 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy.engine import URL
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from models import db, User, File, Collection, DownloadLog, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import dbutils
@@ -58,6 +59,11 @@ app = Flask(__name__,
         static_url_path='/api/static',
         static_folder='static',
         template_folder='templates')
+
+# The API is reachable only through the single nginx proxy in Compose. Trust
+# exactly that hop so request.remote_addr reflects the browser IP for rate
+# limiting without accepting arbitrary forwarded addresses.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 conf = read_config()
 public_origin = conf["redirect"]["url"].rstrip("/")
@@ -289,6 +295,10 @@ def patch_user():
         user_id = dict(session).get('user', None)["id"]
         user = dbutils.update_user(user, user_id=user_id)
         return jsonify({"message": "user updated", "user": user}), 200
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 400
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when updating user"), 500
@@ -399,6 +409,10 @@ def patch_file():
         file = request.get_json()
         dbutils.update_file(db, file, session["user"]["id"])
         return jsonify(message="file updated"), 200
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 400
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when updating file"), 500
@@ -938,6 +952,7 @@ def search_collection():
 @accesskey_login
 @dev_login
 @login_required
+@admin_required
 def search_role():
     try:
         data = request.get_json()
@@ -954,6 +969,7 @@ def search_role():
 @accesskey_login
 @dev_login
 @login_required
+@admin_required
 def search_policy():
     try:
         data = request.get_json()

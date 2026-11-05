@@ -34,7 +34,12 @@ class TimedCache(object):
                 self.timers[args_key] = now
                 return result
             return self.cache[args_key]
+        wrap.cache_clear = self.clear
         return wrap
+
+    def clear(self):
+        self.cache.clear()
+        self.timers.clear()
 
 @TimedCache(timeout=60)
 def is_admin(user_id):
@@ -332,6 +337,7 @@ def update_user(user, user_id=None):
         user.pop("id", None)
         overwrite = user.pop("overwrite", False)
 
+        roles_supplied = "roles" in user
         roles = user.pop("roles", [])
         if is_admin(user_id):
             if overwrite:
@@ -350,12 +356,19 @@ def update_user(user, user_id=None):
         if "affiliation" in user:
             dbuser.affiliation = user["affiliation"]
         if "storage_quota" in user:
-            dbuser.storage_quota = user["storage_quota"]
+            if not is_admin(user_id):
+                raise PermissionError("Only administrators can change storage quotas")
+            quota = user["storage_quota"]
+            if not isinstance(quota, int) or isinstance(quota, bool) or not 0 <= quota <= 10 * 1024 * 1024:
+                raise ValueError("Storage quota must be an integer between 0 and 10485760 MB")
+            dbuser.storage_quota = quota
         if "orcid_id" in user:
             if len(user["orcid_id"]) > 0:
                 dbuser.orcid_id = user["orcid_id"]
 
         db.session.commit()
+        if is_admin(user_id) and roles_supplied:
+            invalidate_authz_caches()
 
         return(print_user(dbuser))
     else:
@@ -368,6 +381,7 @@ def delete_role(role_id):
     r = print_role(dbrole)
     Role.query.filter_by(id=role_id).delete()
     db.session.commit()
+    invalidate_authz_caches()
     return(r)
 
 def update_role(role):
@@ -400,6 +414,7 @@ def update_role(role):
                 pp = db.session.query(Policy).filter(Policy.id == p).first()
                 dbrole.policies.append(pp)
     db.session.commit()
+    invalidate_authz_caches()
     return(print_role(dbrole))
 
 def create_role(role_data):
@@ -412,6 +427,7 @@ def create_role(role_data):
                 role.policies.append(policy)
         db.session.add_all([role])
         db.session.commit()
+        invalidate_authz_caches()
         db.session.refresh(role)
         return(print_role(role))
     else:
@@ -816,6 +832,14 @@ def get_scope(userid):
 
     return list_cred, read_cred, write_cred
 
+def invalidate_authz_caches():
+    """Immediately apply role and policy changes to authorization checks."""
+    is_admin.cache_clear()
+    is_uploader.cache_clear()
+    get_scope.cache_clear()
+    search_files.cache_clear()
+    list_collections.cache_clear()
+
 def add_collection_scope(collection, action, list_cred, read_cred, write_cred):
     for c in collection.collections:
         not_in = not (c.id in list_cred or c.id in read_cred or c.id in write_cred)
@@ -835,6 +859,7 @@ def append_role(user_id, role_name):
     role = Role.query.filter(Role.name==role_name).first()
     user.roles.append(role)
     db.session.commit()
+    invalidate_authz_caches()
 
 @TimedCache(timeout=30)
 def list_collections(user_id):
@@ -1154,12 +1179,24 @@ def update_file(db, file, user_id):
     if "owner_id" in file and is_admin(user_id):
         db_file.owner_id = file["owner_id"]
     if "collection_id" in file:
-        db_file.collection_id = file["collection_id"]
+        collection_id = file["collection_id"]
+        destination = db.session.query(Collection).filter(Collection.id == collection_id).first()
+        if not destination:
+            raise ValueError("Destination collection does not exist")
+        if destination.owner_id != user_id and destination.id not in write_creds and not is_admin(user_id):
+            raise PermissionError("No write permission for destination collection")
+        db_file.collection_id = collection_id
     if "visibility" in file:
+        if file["visibility"] not in {"hidden", "visible"}:
+            raise ValueError("Invalid file visibility")
         db_file.visibility = file["visibility"]
     if "status" in file:
+        if file["status"] not in {"uploading", "ready"}:
+            raise ValueError("Invalid file status")
         db_file.status = file["status"]
     if "accessibility" in file:
+        if file["accessibility"] not in {"locked", "open"}:
+            raise ValueError("Invalid file accessibility")
         db_file.accessibility = file["accessibility"]
     if "meta" in file:
         db_file.meta = file["meta"]
@@ -1203,6 +1240,7 @@ def create_policy(data):
     policy = Policy(action=data["action"], effect=data["effect"], collections=collections, files=files, name=data.pop("name", None), description=data.pop("description", None))
     db.session.add_all([policy])
     db.session.commit()
+    invalidate_authz_caches()
     db.session.refresh(policy)
     return(print_policy(policy))
 
@@ -1211,6 +1249,7 @@ def delete_policy(policy_id):
     p = print_policy(dbpolicy)
     Policy.query.filter_by(id=policy_id).delete()
     db.session.commit()
+    invalidate_authz_caches()
     return(p)
 
 def list_user_access_keys(user_id):
