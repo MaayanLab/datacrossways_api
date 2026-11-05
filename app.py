@@ -10,6 +10,7 @@ from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from sqlalchemy.engine import URL
 
 from models import db, User, File, Collection, DownloadLog, Role, UserRole, Policy, RolePolicy, PolicyCollections, PolicyFiles, Accesskey
 import dbutils
@@ -105,7 +106,15 @@ def enforce_request_security():
                 abort(429)
             window.append(now)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://"+conf["database"]["user"]+":"+conf["database"]["pass"]+"@"+conf["database"]["server"]+":"+conf["database"]["port"]+"/"+conf["database"]["name"]
+app.config['SQLALCHEMY_DATABASE_URI'] = URL.create(
+    "postgresql+psycopg2",
+    username=conf["database"]["user"],
+    password=conf["database"]["pass"],
+    host=conf["database"]["server"],
+    port=int(conf["database"]["port"]),
+    database=conf["database"]["name"],
+    query={"sslmode": conf["database"].get("sslmode", "prefer")},
+)
 app.config['SQLALCHEMY_POOL_SIZE'] = 40
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

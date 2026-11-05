@@ -1,6 +1,7 @@
 import boto3
 import json
 import app
+from botocore.config import Config
 
 def delete_file(file_uuid, file_name):
     print(file_uuid)
@@ -19,12 +20,20 @@ def delete_file(file_uuid, file_name):
     )
 
 def get_aws_client(cred):
-    s3_client = boto3.client(
-        's3',
-        region_name=cred["region"],
-        aws_access_key_id=cred["aws_id"],
-        aws_secret_access_key=cred["aws_key"],
-    )
+    addressing_style = cred.get("addressing_style", "auto")
+    if addressing_style not in {"auto", "path", "virtual"}:
+        raise ValueError("S3 addressing style must be auto, path, or virtual")
+    client_options = {
+        "region_name": cred.get("region") or "us-east-1",
+        "config": Config(s3={"addressing_style": addressing_style}),
+    }
+    if cred.get("endpoint_url"):
+        client_options["endpoint_url"] = cred["endpoint_url"]
+    if cred.get("aws_id"):
+        client_options["aws_access_key_id"] = cred["aws_id"]
+    if cred.get("aws_key"):
+        client_options["aws_secret_access_key"] = cred["aws_key"]
+    s3_client = boto3.client('s3', **client_options)
     return s3_client
 
 def sign_get_file(file_name, cred):

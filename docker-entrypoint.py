@@ -33,6 +33,8 @@ config = {
         "aws_key": os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
         "bucket": os.environ.get("S3_BUCKET", ""),
         "region": os.environ.get("AWS_REGION", "us-east-1"),
+        "endpoint_url": os.environ.get("S3_ENDPOINT_URL", ""),
+        "addressing_style": os.environ.get("S3_ADDRESSING_STYLE", "auto"),
     },
     "database": {
         "server": os.environ.get("DB_HOST", "postgres"),
@@ -40,6 +42,7 @@ config = {
         "name": os.environ.get("DB_NAME", "datacrossways"),
         "user": os.environ.get("DB_USER", "datacrossways"),
         "pass": required("DB_PASSWORD"),
+        "sslmode": os.environ.get("DB_SSLMODE", "prefer"),
     },
     "api": {"url": "http://api:5000/"},
     "frontend": {"url": "http://frontend/"},
@@ -72,6 +75,7 @@ for attempt in range(30):
             dbname=config["database"]["name"],
             user=config["database"]["user"],
             password=config["database"]["pass"],
+            sslmode=config["database"]["sslmode"],
         )
         connection.close()
         break
