@@ -2,6 +2,7 @@ import boto3
 import json
 import app
 from botocore.config import Config
+from datetime import datetime, timezone, timedelta
 
 def delete_file(file_uuid, file_name):
     print(file_uuid)
@@ -66,15 +67,34 @@ def start_multipart(filename, cred):
     s3_client = get_aws_client(cred)
     return s3_client.create_multipart_upload(Bucket=cred["bucket"], Key=filename)['UploadId']
 
-def sign_multipart(filename, upload_id, part_number, cred):
+def sign_multipart(filename, upload_id, part_number, content_length, cred):
     s3_client = get_aws_client(cred)
     signed_url = s3_client.generate_presigned_url(
         ClientMethod='upload_part',
         Params={'Bucket': cred['bucket'], 
         'Key': filename, 
         'UploadId': upload_id, 
-        'PartNumber': part_number})
+        'PartNumber': part_number,
+        'ContentLength': content_length},
+        ExpiresIn=600)
     return signed_url
+
+def abort_stale_multipart_uploads(cred, max_age_hours=24):
+    """Abort incomplete uploads after a bounded retention window."""
+    if not cred.get("bucket"):
+        return 0
+    client = get_aws_client(cred)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    aborted = 0
+    paginator = client.get_paginator("list_multipart_uploads")
+    for page in paginator.paginate(Bucket=cred["bucket"]):
+        for upload in page.get("Uploads", []):
+            initiated = upload.get("Initiated")
+            if initiated and initiated < cutoff:
+                client.abort_multipart_upload(
+                    Bucket=cred["bucket"], Key=upload["Key"], UploadId=upload["UploadId"])
+                aborted += 1
+    return aborted
 
 def complete_multipart(filename, upload_id, parts, cred):
     s3_client = get_aws_client(cred)

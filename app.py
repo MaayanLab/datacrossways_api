@@ -82,6 +82,8 @@ app.url_map.converters['int_list'] = IntListConverter
 cache = Cache(app, config={"CACHE_TYPE": "SimpleCache"})
 
 MAX_BATCH_IDS = 100
+MULTIPART_CHUNK_SIZE = 5 * 1024 * 1024
+MULTIPART_MAX_AGE_HOURS = max(int(os.environ.get("MULTIPART_MAX_AGE_HOURS", "24")), 1)
 rate_windows = defaultdict(deque)
 rate_lock = Lock()
 
@@ -180,6 +182,15 @@ def search_checksum():
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=search_checksum, trigger="interval", seconds=15)
+def cleanup_multipart_uploads():
+    try:
+        aborted = s3utils.abort_stale_multipart_uploads(conf["aws"], MULTIPART_MAX_AGE_HOURS)
+        if aborted:
+            logging.info("Aborted %s stale multipart uploads", aborted)
+    except Exception:
+        logging.exception("Could not clean up stale multipart uploads")
+
+scheduler.add_job(func=cleanup_multipart_uploads, trigger="interval", hours=1)
 scheduler.start()
 
 @app.route('/api/stats', methods = ["GET"])
@@ -454,6 +465,10 @@ def get_file_meta(file_id):
     try:
         metadata = dbutils.get_file_metadata(db, file_id, session["user"]["id"])
         return jsonify(meta=metadata), 200
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 404
     except Exception:
         return jsonify(message="An error occurred when retrieving metadata for file"), 500
 
@@ -470,6 +485,10 @@ def get_file_meta_list(file_ids):
             metadata = dbutils.get_file_metadata(db, file_id, session["user"]["id"])
             metas.append({"id": file_id, "metadata": metadata})
         return jsonify(meta=metas), 200
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 404
     except Exception:
         return jsonify(message="An error occurred when retrieving metadata for files"), 500
 
@@ -482,6 +501,10 @@ def get_file_by_id(file_id):
     try:
         res = dbutils.get_file_by_id(file_id, dict(session).get('user', None))
         return jsonify(res), 200
+    except PermissionError as exc:
+        return jsonify(message=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(message=str(exc)), 404
     except Exception:
         traceback.print_exc()
         return jsonify(message="An error occurred when attempting to retrieve file"), 500
@@ -510,6 +533,8 @@ def download(fileid):
     try:
         user = dict(session).get('user', None)
         db_file = dbutils.download_file(fileid, user["id"])
+        if not db_file:
+            return jsonify(message="No permission to download file"), 403
         response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
         return jsonify({"message": "URL signed", "url": response}), 200
 
@@ -529,6 +554,8 @@ def download_list(fileids):
         url_list = []
         for fileid in fileids:
             db_file = dbutils.download_file(fileid, user["id"])
+            if not db_file:
+                return jsonify(message=f"No permission to download file {fileid}"), 403
             response = s3utils.sign_get_file(db_file.uuid+"/"+db_file.name, conf["aws"])
             url_list.append({"id": fileid, "url": response})
         return jsonify(urls=url_list), 200
@@ -595,10 +622,17 @@ def startmultipart():
 def signmultipart():
     try:
         data = request.get_json()
-        dbutils.authorize_upload_key(session["user"]["id"], data["filename"])
-        if not 1 <= int(data["part_number"]) <= 10000:
+        db_file = dbutils.authorize_upload_key(session["user"]["id"], data["filename"])
+        part_number = int(data["part_number"])
+        content_length = int(data["content_length"])
+        total_parts = (db_file.size + MULTIPART_CHUNK_SIZE - 1) // MULTIPART_CHUNK_SIZE
+        if not 1 <= part_number <= total_parts <= 10000:
             return jsonify(message="Invalid multipart part number"), 400
-        url = s3utils.sign_multipart(data["filename"], data["upload_id"], data["part_number"], conf["aws"])
+        expected_length = (MULTIPART_CHUNK_SIZE if part_number < total_parts
+                           else db_file.size - MULTIPART_CHUNK_SIZE * (total_parts - 1))
+        if content_length != expected_length:
+            return jsonify(message="Invalid multipart part size"), 400
+        url = s3utils.sign_multipart(data["filename"], data["upload_id"], part_number, content_length, conf["aws"])
         return jsonify({'message': 'multipart upload URL signed', 'url': url}), 200 
     except Exception:
         return jsonify(message="An error occurred when attempting to sign multipart upload URL"), 500
@@ -1017,12 +1051,14 @@ def login_orcid():
         session['redirect_endpoint'] = redirect_endpoint
     return orcid.authorize_redirect(redirect_uri)
 
-@app.route('/api/user/logout')
+@app.route('/api/user/logout', methods=['GET', 'POST'])
 @accesskey_login
 @login_required
 def logout():
     for key in list(session.keys()):
         session.pop(key)
+    if request.method == 'POST':
+        return jsonify(message="Logged out"), 200
     return redirect('/logout')
 
 @app.route('/api/user/authorize')
@@ -1117,6 +1153,10 @@ def nothing():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def proxy(*args, **kwargs):
+    # nginx already sends /api/ traffic here. Proxying an unknown API route
+    # back to nginx creates a request loop that exhausts the worker threads.
+    if request.path == '/api' or request.path.startswith('/api/'):
+        abort(404)
     resp = requests.request(
         method=request.method,
         url=request.url.replace(request.host_url, conf["frontend"]["url"]),
@@ -1128,7 +1168,8 @@ def proxy(*args, **kwargs):
         # i.e. raw binary in the browser.
         headers={key: value for (key, value) in request.headers if key.lower() not in ('host', 'accept-encoding', 'cookie', 'authorization', 'x-api-key')},
         data=request.get_data(),
-        allow_redirects=False)
+        allow_redirects=False,
+        timeout=(3.05, 10))
 
     excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
     headers = [(name, value) for (name, value) in resp.raw.headers.items()

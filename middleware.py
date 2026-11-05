@@ -55,13 +55,20 @@ def admin_required(f):
 def accesskey_login(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not "user" in session.keys():
-            user_key = request.headers.get('x-api-key', None)
-            if user_key:
-                if not dbutils.key_valid(user_key):
-                    return jsonify({'message': 'API key invalid or expired.'}), 403
-                user = dbutils.get_key_user(user_key)
-                session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
-                session.permanent = True
-        return f(*args, **kwargs)
+        user_key = request.headers.get('x-api-key', None)
+        injected_user = False
+        if "user" not in session and user_key:
+            if not dbutils.key_valid(user_key):
+                return jsonify({'message': 'API key invalid or expired.'}), 403
+            user = dbutils.get_key_user(user_key)
+            session["user"] = {"id": user.id, "first_name": user.first_name, "last_name": user.last_name, "email": user.email, "uuid": user.uuid}
+            # API keys authenticate only this request. Never mint a renewable
+            # browser session whose lifetime can outlive a revoked key.
+            session.permanent = False
+            injected_user = True
+        try:
+            return f(*args, **kwargs)
+        finally:
+            if injected_user:
+                session.pop("user", None)
     return decorated_function

@@ -116,7 +116,7 @@ class Collection(db.Model):
     parent_collection_id = db.Column(db.Integer(), db.ForeignKey('collections.id', onupdate='CASCADE'), default=1, index=True)
     owner_id = db.Column(db.Integer(), db.ForeignKey('users.id'), index=True)
     visibility = db.Column(db.String(), default="hidden")
-    accessibility = db.Column(db.String(), default="open")
+    accessibility = db.Column(db.String(), default="locked")
     # Links this collection to a project on the Projects page (its stable
     # funding code, e.g. "Lyme 06b"). Set by the collection's owner; kept
     # separate from `name` so linking never constrains how they organize
